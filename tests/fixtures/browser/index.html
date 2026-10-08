@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Core Example</title>
+  <body>
+    <h1>Local Core</h1>
+    <p>Open the console and call <code>localCore.dispatch(...)</code>. Reload to recover the same database.</p>
+    <p>This demo uses public example credentials. Use your own credentials in an application.</p>
+    <pre id="output">Opening OPFS…</pre>
+    <script type="module">
+      import { LocalCoreClient } from "/dist/index.js";
+      const client = new LocalCoreClient();
+      window.localCore = client;
+      window.demoCredentials = {
+        email: "demo@example.test", password: "public-demo-password-only",
+        projectId: "demo-project", vaultName: "demo-example-v3",
+      };
+      window.ready = client.open("example-v3", window.demoCredentials).catch(error => {
+        if (error.name !== "ProjectNotInitializedError") throw error;
+        return client.createProject("example-v3", window.demoCredentials);
+      }).then(result => {
+        document.querySelector("#output").textContent = JSON.stringify(result, null, 2);
+        return result;
+      });
+      window.example = async () => {
+        await window.ready;
+        const itemId = crypto.randomUUID();
+        await client.dispatch({ type: "ITEM_ADDED", itemId, fields: { title: "First item", done: false } });
+        await client.dispatch({ type: "ITEM_UPDATED", itemId, fields: { done: true } });
+        const events = await client.readEvents();
+        const snapshot = await client.snapshot();
+        document.querySelector("#output").textContent = JSON.stringify(snapshot, null, 2);
+        return { events, snapshot };
+      };
+      window.ready.catch(error => {
+        document.querySelector("#output").textContent = `${error.name}: ${error.message}`;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,263 @@
+{
+  "browser": "154.0.8037.98",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "timestamp": "2026-10-07T18:05:15.720Z",
+  "startupMs": 5.600000001490116,
+  "samples": 7,
+  "warmups": 2,
+  "itemCount": 5000,
+  "results": [
+    {
+      "events": 10000,
+      "visibleItems": 4949,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 1102506,
+      "tsProjection": {
+        "medianMs": 7.899999998509884,
+        "minMs": 5.200000002980232,
+        "maxMs": 14.600000001490116,
+        "samplesMs": [
+          9.200000002980232,
+          9.5,
+          5.200000002980232,
+          6.899999998509884,
+          5.9000000059604645,
+          14.600000001490116,
+          7.899999998509884
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 2.2999999970197678,
+        "minMs": 2.0999999940395355,
+        "maxMs": 3.600000001490116,
+        "samplesMs": [
+          2.3000000044703484,
+          2.2999999970197678,
+          2.1999999955296516,
+          2.2999999970197678,
+          2.0999999940395355,
+          3.600000001490116,
+          2.399999998509884
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 8.799999997019768,
+        "minMs": 8.100000001490116,
+        "maxMs": 10.5,
+        "samplesMs": [
+          8.799999997019768,
+          8.5,
+          8.100000001490116,
+          8.100000001490116,
+          10.100000001490116,
+          10.5,
+          9
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 2.7999999970197678,
+        "minMs": 2.7000000029802322,
+        "maxMs": 5.100000001490116,
+        "samplesMs": [
+          2.8000000044703484,
+          2.7999999970197678,
+          2.7000000029802322,
+          2.7999999970197678,
+          2.8000000044703484,
+          2.7999999970197678,
+          5.100000001490116
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 3.600000001490116,
+        "minMs": 3.1999999955296516,
+        "maxMs": 4.600000001490116,
+        "samplesMs": [
+          3.600000001490116,
+          3.600000001490116,
+          4.5,
+          3.3000000044703484,
+          3.1999999955296516,
+          4.600000001490116,
+          3.7000000029802322
+        ]
+      },
+      "wasmLinearMemoryBytes": 8388608
+    },
+    {
+      "events": 100000,
+      "visibleItems": 4160,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 10020756,
+      "tsProjection": {
+        "medianMs": 21,
+        "minMs": 18.80000000447035,
+        "maxMs": 23.69999999552965,
+        "samplesMs": [
+          20.100000001490116,
+          21,
+          21,
+          18.80000000447035,
+          23.69999999552965,
+          22.399999998509884,
+          23.399999998509884
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 5.5,
+        "minMs": 5.299999997019768,
+        "maxMs": 6,
+        "samplesMs": [
+          5.399999998509884,
+          5.5,
+          6,
+          5.299999997019768,
+          5.300000004470348,
+          5.5,
+          5.5
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 34.100000001490116,
+        "minMs": 32.79999999701977,
+        "maxMs": 51.29999999701977,
+        "samplesMs": [
+          33,
+          32.79999999701977,
+          51.29999999701977,
+          34.100000001490116,
+          42.79999999701977,
+          34.5,
+          33.79999999701977
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 24.80000000447035,
+        "minMs": 24.299999997019768,
+        "maxMs": 31.299999997019768,
+        "samplesMs": [
+          24.5,
+          24.299999997019768,
+          25,
+          24.5,
+          25.100000001490116,
+          24.80000000447035,
+          31.299999997019768
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 2.7000000029802322,
+        "minMs": 2.600000001490116,
+        "maxMs": 3.399999998509884,
+        "samplesMs": [
+          2.7000000029802322,
+          2.8000000044703484,
+          2.600000001490116,
+          2.6999999955296516,
+          3.399999998509884,
+          2.7000000029802322,
+          3
+        ]
+      },
+      "wasmLinearMemoryBytes": 26738688
+    },
+    {
+      "events": 300000,
+      "visibleItems": 3245,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 29838960,
+      "tsProjection": {
+        "medianMs": 58.400000005960464,
+        "minMs": 52.19999999552965,
+        "maxMs": 67.70000000298023,
+        "samplesMs": [
+          58.5,
+          57,
+          67.70000000298023,
+          52.19999999552965,
+          53.30000000447035,
+          66.10000000149012,
+          58.400000005960464
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 13.200000002980232,
+        "minMs": 12.700000002980232,
+        "maxMs": 17.200000002980232,
+        "samplesMs": [
+          12.700000002980232,
+          14.399999998509884,
+          13.200000002980232,
+          13.399999998509884,
+          12.799999997019768,
+          17.200000002980232,
+          13.099999994039536
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 92.70000000298023,
+        "minMs": 89.90000000596046,
+        "maxMs": 96.79999999701977,
+        "samplesMs": [
+          96.79999999701977,
+          93.60000000149012,
+          93.69999999552965,
+          91.20000000298023,
+          92.70000000298023,
+          90.10000000149012,
+          89.90000000596046
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 77.39999999850988,
+        "minMs": 74.89999999850988,
+        "maxMs": 82.79999999701977,
+        "samplesMs": [
+          78.10000000149012,
+          75.19999999552965,
+          76.30000000447035,
+          82.79999999701977,
+          74.89999999850988,
+          77.39999999850988,
+          81.39999999850988
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 2.0999999940395355,
+        "minMs": 2,
+        "maxMs": 2.7000000029802322,
+        "samplesMs": [
+          2.7000000029802322,
+          2.3000000044703484,
+          2.0999999940395355,
+          2.100000001490116,
+          2.0999999940395355,
+          2,
+          2.0999999940395355
+        ]
+      },
+      "wasmLinearMemoryBytes": 93978624
+    }
+  ],
+  "scope": "Decrypted/authorized commands; excludes cryptography, OPFS I/O, RPC and event generation. Kernel includes binary parse, LWW and binary output; full includes dictionaries/packing, kernel, snapshot decode and scratch clearing.",
+  "memoryScope": "WASM linear-memory high-water, not total application/JS heap or live native allocations.",
+  "diagnostics": {
+    "backend": "wasm",
+    "abi": 1,
+    "mergeCalls": 84,
+    "projectedEvents": 11480000,
+    "maxInputBytes": 29838960,
+    "memoryBytes": 93978624
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "dedicatedWorker": true
+}

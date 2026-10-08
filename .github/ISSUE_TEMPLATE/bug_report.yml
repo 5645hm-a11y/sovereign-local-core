@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a reproducible core, storage, transport or SDK bug.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Package version, browser, OS and bundler. Do not include secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Steps or a small public reproduction repository.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

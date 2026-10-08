@@ -1,0 +1,21 @@
+export * from "./types.js";
+export { LocalCore } from "./engine.js";
+export { LocalCoreClient } from "./client.js";
+export type { LocalCoreClientOptions } from "./client.js";
+export { LWWMerge, EventMaterializer } from "./crdt.js";
+export { LocalEventStore } from "./local-store.js";
+export { openOPFSStore } from "./opfs.js";
+export { LogCorruptionError, UncertainCommitError } from "./framed-log.js";
+export { P2PSync } from "./p2p-sync.js";
+export type { P2PState, P2PSyncOptions, P2PStats } from "./p2p-sync.js";
+export { createIdentityVault, unlockIdentityVault, signEvent, verifySignature,
+  IdentityUnlockError, InvalidEventSignatureError, EventProjectMismatchError, PBKDF2_ITERATIONS } from "./identity.js";
+export type { IdentityVault, UnlockedIdentity } from "./identity.js";
+export { ProjectContext } from "./project.js";
+export { AuthorizationError, issueCertificate, verifyCertificate, verifyDescriptor } from "./certificates.js";
+export { ProjectNotInitializedError } from "./project-storage.js";
+export { StorageEngine, fileChunks } from "./storage.js";
+export { P2PStorage } from "./storage-client.js";
+export type { IStorageCore } from "./storage-client.js";
+export { OPFSBlobStore } from "./blob-store.js";
+export type { FileManifest, ChunkRequest, IBlobStore, IChunkProvider, IChunkTransport, UploadOptions, StorageProgress, StorageReadOptions } from "./storage-format.js";

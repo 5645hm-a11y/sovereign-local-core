@@ -1,0 +1,15 @@
+{
+  "name": "p2p-next-smoke",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "build:webpack": "next build --webpack",
+    "start": "next start --hostname 127.0.0.1 --port 4190"
+  },
+  "dependencies": {
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sovereign-local-core": "file:../../../artifacts/sovereign-local-core-0.1.0.tgz"
+  }
+}

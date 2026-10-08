@@ -1,0 +1,280 @@
+{
+  "runtime": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "timestamp": "2026-10-07T18:05:21.927Z",
+  "startupMs": 3.3586000000000027,
+  "samples": 7,
+  "warmups": 2,
+  "itemCount": 5000,
+  "results": [
+    {
+      "events": 10000,
+      "visibleItems": 4949,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 1102506,
+      "tsProjection": {
+        "medianMs": 11.684500000000014,
+        "minMs": 8.196499999999958,
+        "maxMs": 18.03679999999997,
+        "samplesMs": [
+          10.845700000000022,
+          18.03679999999997,
+          11.836999999999989,
+          11.692700000000002,
+          11.684500000000014,
+          10.470699999999965,
+          8.196499999999958
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 2.3204000000000065,
+        "minMs": 2.251100000000008,
+        "maxMs": 2.690400000000011,
+        "samplesMs": [
+          2.317100000000039,
+          2.690400000000011,
+          2.374499999999955,
+          2.3722999999999956,
+          2.271600000000035,
+          2.3204000000000065,
+          2.251100000000008
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 10.208500000000015,
+        "minMs": 9.194999999999993,
+        "maxMs": 13.055900000000008,
+        "samplesMs": [
+          9.319999999999993,
+          9.507399999999961,
+          10.223400000000026,
+          10.208500000000015,
+          9.194999999999993,
+          10.787300000000016,
+          13.055900000000008
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 3.423400000000015,
+        "minMs": 3.3892000000000166,
+        "maxMs": 4.778800000000047,
+        "samplesMs": [
+          3.423400000000015,
+          3.400599999999997,
+          3.3892000000000166,
+          3.606200000000001,
+          4.778800000000047,
+          3.4277999999999906,
+          3.4230999999999767
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 3.1639000000000124,
+        "minMs": 3.1487000000000194,
+        "maxMs": 4.7379999999999995,
+        "samplesMs": [
+          3.264499999999998,
+          3.9902000000000157,
+          4.7379999999999995,
+          3.1544999999999845,
+          3.1639000000000124,
+          3.1487000000000194,
+          3.1603000000000065
+        ]
+      },
+      "wasmLinearMemoryBytes": 8388608
+    },
+    {
+      "events": 100000,
+      "visibleItems": 4160,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 10020756,
+      "tsProjection": {
+        "medianMs": 32.54870000000005,
+        "minMs": 30.038400000000024,
+        "maxMs": 37.631000000000085,
+        "samplesMs": [
+          30.038400000000024,
+          30.979299999999967,
+          37.631000000000085,
+          32.54870000000005,
+          35.03009999999995,
+          34.56940000000009,
+          31.198599999999942
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 5.472299999999905,
+        "minMs": 5.391700000000128,
+        "maxMs": 6.113499999999931,
+        "samplesMs": [
+          5.391700000000128,
+          5.460000000000036,
+          6.113499999999931,
+          5.412299999999959,
+          5.496200000000044,
+          5.894800000000032,
+          5.472299999999905
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 40.087600000000066,
+        "minMs": 39.443700000000035,
+        "maxMs": 49.50189999999998,
+        "samplesMs": [
+          40.087600000000066,
+          49.50189999999998,
+          42.680500000000166,
+          39.81009999999992,
+          39.443700000000035,
+          41.11660000000006,
+          39.551499999999805
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 31.56809999999996,
+        "minMs": 31.296299999999974,
+        "maxMs": 31.744500000000016,
+        "samplesMs": [
+          31.697200000000066,
+          31.744500000000016,
+          31.59120000000007,
+          31.3759,
+          31.56809999999996,
+          31.296299999999974,
+          31.538899999999785
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 2.668100000000095,
+        "minMs": 2.6521999999999935,
+        "maxMs": 2.7917999999999665,
+        "samplesMs": [
+          2.668100000000095,
+          2.7562000000000353,
+          2.7917999999999665,
+          2.6521999999999935,
+          2.6777000000001863,
+          2.6539999999999964,
+          2.663000000000011
+        ]
+      },
+      "wasmLinearMemoryBytes": 26738688
+    },
+    {
+      "events": 300000,
+      "visibleItems": 3245,
+      "fieldsPerWrite": 4,
+      "actors": 16,
+      "inputBytes": 29838960,
+      "tsProjection": {
+        "medianMs": 115.90170000000035,
+        "minMs": 81.77620000000024,
+        "maxMs": 132.08910000000014,
+        "samplesMs": [
+          87.42789999999968,
+          81.77620000000024,
+          115.90170000000035,
+          122.21060000000034,
+          132.08910000000014,
+          100.82009999999991,
+          120.25799999999981
+        ]
+      },
+      "wasmKernel": {
+        "medianMs": 17.09940000000006,
+        "minMs": 13.977399999999761,
+        "maxMs": 17.953899999999976,
+        "samplesMs": [
+          14.15310000000045,
+          17.953899999999976,
+          13.982899999999972,
+          17.317399999999907,
+          17.09940000000006,
+          13.977399999999761,
+          17.728100000000268
+        ]
+      },
+      "wasmWithBridge": {
+        "medianMs": 136.71519999999964,
+        "minMs": 114.36919999999964,
+        "maxMs": 180.14450000000033,
+        "samplesMs": [
+          115.49150000000009,
+          131.34410000000025,
+          114.36919999999964,
+          137.57050000000072,
+          137.21759999999995,
+          136.71519999999964,
+          180.14450000000033
+        ]
+      },
+      "packAndClear": {
+        "medianMs": 101.88989999999967,
+        "minMs": 97.41960000000017,
+        "maxMs": 128.29029999999966,
+        "samplesMs": [
+          98.55330000000004,
+          101.88989999999967,
+          97.41960000000017,
+          128.29029999999966,
+          123.3148000000001,
+          100.76370000000043,
+          105.76569999999992
+        ]
+      },
+      "decodeSnapshot": {
+        "medianMs": 2.2984999999998763,
+        "minMs": 2.0807999999997264,
+        "maxMs": 4.34900000000016,
+        "samplesMs": [
+          2.1983000000000175,
+          2.0807999999997264,
+          2.2984999999998763,
+          4.34900000000016,
+          3.152299999999741,
+          2.363299999999981,
+          2.0868000000000393
+        ]
+      },
+      "wasmLinearMemoryBytes": 93978624
+    }
+  ],
+  "scope": "Decrypted/authorized commands; excludes cryptography, OPFS I/O, RPC and event generation. Kernel includes binary parse, LWW and binary output; full includes dictionaries/packing, kernel, snapshot decode and scratch clearing.",
+  "memoryScope": "WASM linear-memory high-water, not total application/JS heap or live native allocations.",
+  "diagnostics": {
+    "backend": "wasm",
+    "abi": 1,
+    "mergeCalls": 84,
+    "projectedEvents": 11480000,
+    "maxInputBytes": 29838960,
+    "memoryBytes": 93978624
+  },
+  "authenticatedReplay": {
+    "events": 1000,
+    "samples": 3,
+    "referenceMs": [
+      435.54199999999946,
+      516.2719999999999,
+      412.29529999999977
+    ],
+    "wasmMs": [
+      477.8247000000001,
+      456.91929999999957,
+      460.28210000000036
+    ],
+    "referenceMedianMs": 435.54199999999946,
+    "wasmMedianMs": 460.28210000000036,
+    "scope": "Same project.evaluate signature/chain checks + AES-GCM decryption, then projection. No OPFS I/O, normalization/dedup or module initialization."
+  }
+}

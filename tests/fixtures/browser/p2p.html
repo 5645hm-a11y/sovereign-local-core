@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Core P2P Example</title>
+  <body>
+    <h1>Local Core P2P</h1>
+    <p>Use different <code>?db=replica-a</code> and <code>?db=replica-b</code> in two tabs.
+      In the console, call <code>connectP2P(roomToken)</code>, then <code>db.dispatch(...)</code>.</p>
+    <p>This demo uses public example credentials and isolated demo vaults. Use your own credentials in an application.</p>
+    <pre id="output">Opening OPFS…</pre>
+    <script type="module">
+      import { LocalCoreClient, P2PSync } from "/dist/index.js";
+      const params = new URLSearchParams(location.search);
+      const db = new LocalCoreClient(); window.db = db;
+      window.sync = null; window.syncErrors = [];
+      const render = async () => {
+        document.querySelector("#output").textContent = JSON.stringify({
+          state: window.sync?.state ?? "offline",
+          snapshot: await db.snapshot(),
+        }, null, 2);
+      };
+      db.onCommit(() => { render().catch(console.error); });
+      const replica = params.get("db") ?? "p2p-example";
+      window.demoCredentials = {
+        email: "demo@example.test", password: "public-demo-password-only",
+        projectId: params.get("project") ?? "demo-project", vaultName: `demo-${replica}-v2`,
+      };
+      window.ready = db.open(`${replica}-v3`, window.demoCredentials).catch(error => {
+        if (error.name !== "ProjectNotInitializedError") throw error;
+        return db.identify(window.demoCredentials).then(result => ({ actorId: result.actorId, needsInvitation: true }));
+      }).then(async opened => {
+        if (opened.needsInvitation) {
+          document.querySelector("#output").textContent = "Create a project or join using its trusted invitation. See createDemoProject() / joinDemoProject(invitation).";
+          return opened;
+        }
+        await render(); return opened;
+      });
+      window.createDemoProject = async () => {
+        await window.ready;
+        const opened = await db.createProject(`${replica}-v3`, window.demoCredentials);
+        window.ready = Promise.resolve(opened); await render(); return opened;
+      };
+      window.joinDemoProject = async invitation => {
+        await window.ready;
+        const opened = await db.open(`${replica}-v3`, { ...window.demoCredentials, invitation });
+        window.ready = Promise.resolve(opened); await render(); return opened;
+      };
+      window.connectP2P = async (roomId, signalingUrl = "ws://127.0.0.1:8787", iceServers = []) => {
+        await window.ready;
+        window.sync?.stop();
+        window.sync = new P2PSync(db, {
+          roomId, signalingUrl, iceServers,
+          onError: error => window.syncErrors.push(error.message),
+        });
+        window.sync.onStateChange(() => { render().catch(console.error); });
+        window.sync.start();
+      };
+      if (params.has("room")) window.ready.then(() => window.connectP2P(
+        params.get("room"), params.get("signal") ?? "ws://127.0.0.1:8787",
+      )).catch(console.error);
+      window.ready.catch(error => {
+        document.querySelector("#output").textContent = `${error.name}: ${error.message}`;
+      });
+    </script>
+  </body>
+</html>

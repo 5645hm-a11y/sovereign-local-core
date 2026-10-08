@@ -1,0 +1,51 @@
+name: Core and SDK checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up the tested native toolchain
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git .tools/emsdk-main
+          .tools/emsdk-main/emsdk install 6.0.11
+          .tools/emsdk-main/emsdk activate 6.0.11
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome
+      - name: Unit and browser regressions
+        run: |
+          source .tools/emsdk-main/emsdk_env.sh
+          npm test
+          npm run test:browser
+      - name: Installed-package SDK and public examples
+        run: |
+          source .tools/emsdk-main/emsdk_env.sh
+          npm run test:dx
+      - run: npm run check:release
+      - name: Scan committed source for secrets
+        run: |
+          mkdir -p .tools/security
+          cd .tools/security
+          curl --fail --location --silent --show-error --output gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          curl --fail --location --silent --show-error --output checksums.txt https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt
+          grep 'gitleaks_8.30.1_linux_x64.tar.gz$' checksums.txt | sed 's/gitleaks_8.30.1_linux_x64.tar.gz/gitleaks.tar.gz/' | sha256sum --check
+          tar -xzf gitleaks.tar.gz gitleaks
+          cd ../..
+          .tools/security/gitleaks git --redact --no-banner --log-opts='HEAD'
