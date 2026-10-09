@@ -13,7 +13,8 @@ struct OwnedRegister { OwnedStamp stamp; OwnedValue value; };
 struct OwnedItem { OwnedStamp existence; bool present = false; std::map<Text, OwnedRegister> fields; };
 using State = std::map<Text, OwnedItem>;
 using ActorCache = std::unordered_map<Slice, std::shared_ptr<const Text>, SliceHash, SliceEqual>;
-struct Session { State items; };
+struct BusinessState;
+struct Session { State items; std::shared_ptr<BusinessState> business; };
 std::unordered_map<uint32_t, std::unique_ptr<Session>> sessions;
 uint32_t next_session = 0;
 bool heap_input(const uint8_t* p, uint32_t size) {

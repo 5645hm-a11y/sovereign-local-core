@@ -66,4 +66,23 @@ function App() {
     {mounted && <Project/>}
   </main>;
 }
+// Installed optional-entry probe, also exercised in the production /demo/ bundle.
+window.probeNostr = async url => {
+  const { NostrDiscovery } = await import("sovereign-local-core/nostr");
+  const provider = new NostrDiscovery({ relays: [url] });
+  const bytes = crypto.getRandomValues(new Uint8Array(64));
+  const topic = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+    .replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  let receive, timer;
+  const delivered = new Promise((resolve, reject) => {
+    receive = resolve;
+    timer = setTimeout(() => reject(new Error("Installed Nostr adapter receive timed out")), 5000);
+  });
+  try {
+    await provider.start(topic, receive);
+    await provider.publish(bytes);
+    const received = await delivered;
+    return { equal: received.every((value, index) => value === bytes[index]), ...provider.stats };
+  } finally { clearTimeout(timer); provider.stop(); }
+};
 createRoot(document.getElementById("root")).render(<StrictMode><App/></StrictMode>);

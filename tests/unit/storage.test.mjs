@@ -6,6 +6,9 @@ import { ProjectContext } from "../../dist/project.js";
 import { StorageEngine, CHUNK_BYTES, manifestDigest, manifestFields, hashChunk } from "../../dist/storage.js";
 import { P2PStorage } from "../../dist/storage-client.js";
 import { P2PSync } from "../../dist/p2p-sync.js";
+import { SyncSession } from "../../dist/sync-session.js";
+import { rtcByteLink } from "../../dist/rtc-byte-link.js";
+import { decodeWire } from "../../dist/binary-events.js";
 import { generateProjectKey, fieldsAAD } from "../../dist/project-crypto.js";
 import { signEvent, verifySignature } from "../../dist/identity.js";
 import { encodeCommands } from "../../dist/binary-command.js";
@@ -220,6 +223,39 @@ test("concurrent file consumers serialize chunk pulls rather than failing or buf
     const received = await Promise.all(results.map(async r => (await files.readBlob(r.manifest.fileId)).text()));
     assert.deepEqual(received, ["first", "second"]); assert.equal(link.transports[1].stats.chunksRequested, 2);
   } finally { link.stop(); await f.close(); }
+});
+
+test("the next pull may arrive before the previous response write settles without overlapping chunk loads", async () => {
+  const f = await fixture(), channels = mockChannelPair();
+  const links = channels.map(channel => rtcByteLink(channel)), writer = links[0].writable.getWriter();
+  let responsePending = false, overlapped = false, active = 0, maximumActive = 0;
+  const delayed = { ...links[0], writable: new WritableStream({ async write(bytes) {
+    let response = false;
+    try { response = decodeWire(bytes.subarray(20)).type === "CHUNK_RESPONSE"; } catch { /* Other or fragmented frames. */ }
+    if (response) responsePending = true;
+    try { await writer.write(bytes); if (response) await new Promise(resolve => setTimeout(resolve, 30)); }
+    finally { if (response) responsePending = false; }
+  }, abort: reason => writer.abort(reason) }) };
+  const serving = { ...f.adapters[0], async serveChunk(request) {
+    active++; maximumActive = Math.max(maximumActive, active);
+    try { return await f.adapters[0].serveChunk(request); } finally { active--; }
+  } };
+  const sessions = [new SyncSession(serving), new SyncSession(f.adapters[1])];
+  try {
+    sessions[0].connect(delayed); sessions[1].connect(links[1]);
+    await until(() => sessions.every(sync => sync.state === "online"));
+    const receive = channels[0].onmessage;
+    channels[0].onmessage = event => {
+      try { if (decodeWire(new Uint8Array(event.data, 16)).type === "CHUNK_REQUEST" && responsePending) overlapped = true; } catch { /* Other frames. */ }
+      receive(event);
+    };
+    const results = await Promise.all([f.services[0].upload(new Blob(["first"])), f.services[0].upload(new Blob(["second"]))]);
+    await f.b.ingestEvents(results.map(r => r.event));
+    const files = new P2PStorage(f.adapters[1]); files.addPeer(sessions[1]);
+    assert.deepEqual(await Promise.all(results.map(async r => (await files.readBlob(r.manifest.fileId)).text())), ["first", "second"]);
+    assert.equal(overlapped, true, "A request actually arrived while the preceding response write was pending");
+    assert.equal(maximumActive, 1); assert.ok(sessions.every(sync => sync.state === "online"));
+  } finally { sessions.forEach(sync => sync.stop()); await f.close(); }
 });
 
 test("readBlob pins the size-checked manifest once so replacement cannot bypass the memory cap", async () => {

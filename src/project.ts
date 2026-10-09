@@ -4,13 +4,15 @@ import { encodeBinary } from "./binary-codec.js";
 import { requireValidEvent, type UnlockedIdentity } from "./identity.js";
 import { decryptFields, decryptCommand, fieldsAAD, generateProjectKey, normalizeInvitation, signInvitation, verifyInvitationSignature, unwrapProjectKey, wrapProjectKey, type ProjectKey } from "./project-crypto.js";
 import { eventText, canonicalEventBytes, legacyEventText, normalizeCommand } from "./validation.js";
-import type { Certificate, IEvent, ItemCommand, ProjectDescriptor, ProjectInvitation, Role } from "./types.js";
+import type { Certificate, IEvent, ItemCommand, ProjectDescriptor, ProjectInvitation, ReducerPolicies, Role } from "./types.js";
+import { normalizePolicies } from "./policies.js";
 import { isDataType } from "./types.js";
 
 export type PlainItemEvent = ItemCommand & { readonly id: string; readonly actorId: string; readonly sequence: number; readonly lamport: number };
 export interface ProjectEvaluation {
   readonly items: readonly PlainItemEvent[];
   readonly blocks: readonly Uint8Array<ArrayBuffer>[];
+  readonly roles: readonly Role[];
   readonly eligible: ReadonlySet<string>;
   readonly keys: ReadonlyMap<string, ProjectKey>;
   readonly currentKeyId: string;
@@ -34,11 +36,12 @@ export class ProjectContext {
   get descriptor(): ProjectDescriptor { return this.invitation.descriptor; }
   get certificate(): Certificate { return this.invitation.certificate; }
 
-  static async create(identity: UnlockedIdentity, projectId: string): Promise<ProjectContext> {
+  static async create(identity: UnlockedIdentity, projectId: string, policies?: ReducerPolicies): Promise<ProjectContext> {
     normalizeProjectId(projectId);
+    const pinnedPolicies = policies === undefined ? undefined : normalizePolicies(policies);
     const key = await generateProjectKey();
     const rootCertificate = await issueCertificate(identity, projectId, identity.actorId, "Admin", 0, null);
-    const descriptor = await signDescriptor({ version: 1, projectId, rootActorId: identity.actorId,
+    const descriptor = await signDescriptor({ version: pinnedPolicies ? 2 : 1, ...(pinnedPolicies ? { policies: pinnedPolicies } : {}), projectId, rootActorId: identity.actorId,
       genesisKeyId: key.id, rootCertificate, signature: "A".repeat(86) }, identity);
     const invitation = await signInvitation({ version: 1, descriptor, certificate: rootCertificate,
       keys: [await wrapProjectKey(key, projectId, identity.actorId)], currentKeyId: key.id, signature: "A".repeat(86) }, identity);
@@ -137,13 +140,14 @@ export class ProjectContext {
       if (e.type === "MEMBER_INVITED") await absorb(e.invitation.keys);
       if (e.type === "MEMBER_REVOKED") await absorb(e.revocation.envelopes);
     }
-    const items: PlainItemEvent[] = [], blocks: Uint8Array<ArrayBuffer>[] = [];
+    const items: PlainItemEvent[] = [], blocks: Uint8Array<ArrayBuffer>[] = [], roles: Role[] = [];
     for (const e of events) if (eligible.has(e.id) && e.type !== "MEMBER_INVITED" && e.type !== "MEMBER_REVOKED") {
       if (!ids.has(e.keyId)) throw new AuthorizationError("Unknown project key epoch");
       const key = keys.get(e.keyId);
       if (!key) throw new AuthorizationError("This identity has no decryption key for the event epoch");
       if (binary) {
         blocks.push(await decryptCommand(e.encryptedFields, fieldsAAD(e, e.type, e.itemId, e.keyId), key));
+        roles.push(e.certificate.role);
       } else {
         const fields = await decryptFields(e.encryptedFields, fieldsAAD(e, e.type, e.itemId, e.keyId), key);
         const command = normalizeCommand(e.type === "ITEM_DELETED" ? { type: e.type, itemId: e.itemId } : { type: e.type, itemId: e.itemId, fields });
@@ -152,13 +156,13 @@ export class ProjectContext {
       }
     }
     const last = revocations.at(-1);
-    return { items, blocks, eligible, keys, certificates, revocations, governance: events.filter(e => !isDataType(e.type)),
+    return { items, blocks, roles, eligible, keys, certificates, revocations, governance: events.filter(e => !isDataType(e.type)),
       currentKeyId: last?.type === "MEMBER_REVOKED" && last.lamport >= this.certificate.issuedLamport ? last.revocation.keyId : this.invitation.currentKeyId };
   }
   evaluateBinary(input: readonly IEvent[]): Promise<ProjectEvaluation> { return this.evaluate(input, true); }
   /** Only item deltas use this path. Governance changes require authoritative history re-evaluation. */
   async extend(state: ProjectEvaluation, events: readonly IEvent[]): Promise<ProjectEvaluation> {
-    const blocks: Uint8Array<ArrayBuffer>[] = [], eligible = new Set<string>(), certificates = new Map(state.certificates);
+    const blocks: Uint8Array<ArrayBuffer>[] = [], roles: Role[] = [], eligible = new Set<string>(), certificates = new Map(state.certificates);
     try {
       for (const e of events) {
         if (!isDataType(e.type)) throw new Error("Governance delta requires full replay");
@@ -171,11 +175,12 @@ export class ProjectContext {
         const key = state.keys.get(e.keyId);
         if (!key) throw new AuthorizationError("Unknown project key epoch");
         blocks.push(await decryptCommand(e.encryptedFields, fieldsAAD(e, e.type, e.itemId, e.keyId), key));
+        roles.push(e.certificate.role);
         eligible.add(e.id);
         const old = certificates.get(e.actorId);
         if (!old || e.certificate.issuedLamport > old.issuedLamport || (e.certificate.issuedLamport === old.issuedLamport && certificateText(e.certificate) > certificateText(old))) certificates.set(e.actorId, e.certificate);
       }
-      return { ...state, items: [], blocks, eligible, certificates };
+      return { ...state, items: [], blocks, roles, eligible, certificates };
     } catch (error) { for (const block of blocks) block.fill(0); throw error; }
   }
   async restorePolicy(controls: readonly IEvent[], certificates: readonly Certificate[]): Promise<ProjectEvaluation> {

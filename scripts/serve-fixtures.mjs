@@ -10,7 +10,7 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://localhost");
     const route = url.pathname === "/" ? "examples/index.html" : decodeURIComponent(url.pathname).slice(1);
-    const fixture = { "examples/index.html": "tests/fixtures/browser/index.html", "examples/p2p.html": "tests/fixtures/browser/p2p.html" }[route];
+    const fixture = { "examples/index.html": "tests/fixtures/browser/index.html", "examples/p2p.html": "tests/fixtures/browser/p2p.html", "examples/policy.html": "tests/fixtures/browser/policy.html" }[route];
     const pathname = fixture ?? route;
     if (!(fixture || pathname.startsWith("dist/"))) {
       response.writeHead(404).end(); return;

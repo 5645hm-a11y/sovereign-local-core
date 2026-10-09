@@ -1,14 +1,14 @@
 import { LocalCoreClient, type LocalCoreClientOptions } from "./client.js";
 import { P2PSync, type P2PState, type P2PSyncOptions } from "./p2p-sync.js";
-import type { IdentityOpenOptions, Snapshot } from "./types.js";
+import type { EmailIdentityOpenOptions, WalletOpenOptions, Snapshot } from "./types.js";
 
-export interface ProjectCredentials extends Omit<IdentityOpenOptions, "projectId"> {
+export type ProjectCredentials = (Omit<EmailIdentityOpenOptions, "projectId"> | Omit<WalletOpenOptions, "projectId">) & {
   readonly databaseName?: string;
   /** Create a new root only if the local descriptor is absent. Never replaces an existing root. */
   readonly createIfMissing?: boolean;
   readonly clientOptions?: LocalCoreClientOptions;
   readonly p2p?: P2PSyncOptions;
-}
+};
 export interface ProjectState {
   readonly status: "loading" | "ready" | "error" | "closed";
   readonly client: LocalCoreClient | null;

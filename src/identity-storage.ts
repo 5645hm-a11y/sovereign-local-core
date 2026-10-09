@@ -1,5 +1,5 @@
 import { FramedLog, LogCorruptionError, type SyncFile } from "./framed-log.js";
-import { createIdentityVault, normalizeEmail, normalizeVault, unlockIdentityVault, type IdentityVault, type UnlockedIdentity } from "./identity.js";
+import { createIdentityVault, createWalletVault, normalizeWalletId, normalizeEmail, normalizeVault, unlockIdentityVault, unlockWalletVault, type IdentityVault, type UnlockedIdentity } from "./identity.js";
 import { toBase64Url } from "./crypto-codec.js";
 import type { IdentityOpenOptions } from "./types.js";
 
@@ -8,9 +8,10 @@ type SyncCapableHandle = FileSystemFileHandle & { createSyncAccessHandle(): Prom
 /** Vault creation/read is serialized across workers. Only encrypted bytes are ever written. */
 export async function openIdentityVault(options: IdentityOpenOptions): Promise<UnlockedIdentity> {
   if (!options || typeof options !== "object") throw new TypeError("Identity credentials required");
-  const email = normalizeEmail(options.email);
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
-  const vaultName = options.vaultName ?? `account_${toBase64Url(digest)}`;
+  const wallet = options.mode === "wallet";
+  const selector = wallet ? normalizeWalletId(options.walletId) : normalizeEmail(options.email);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(selector));
+  const vaultName = options.vaultName ?? `${wallet ? "wallet" : "account"}_${toBase64Url(digest)}`;
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(vaultName)) throw new TypeError("Invalid vault name");
   return navigator.locks.request(`sovereign-vault:${vaultName}`, async () => {
     const root = await navigator.storage.getDirectory();
@@ -24,8 +25,8 @@ export async function openIdentityVault(options: IdentityOpenOptions): Promise<U
         if (vault !== undefined) throw new LogCorruptionError(offset, "multiple vault records");
         vault = normalizeVault(value);
       });
-      if (vault) return await unlockIdentityVault(vault, email, options.password);
-      const created = await createIdentityVault(email, options.password);
+      if (vault) return wallet ? await unlockWalletVault(vault, selector, options.passphrase) : await unlockIdentityVault(vault, selector, options.password);
+      const created = wallet ? await createWalletVault(selector, options.passphrase) : await createIdentityVault(selector, options.password);
       log.append(created.vault); // Flush vault BEFORE any project log can refer to its actor.
       return created.identity;
     } finally { log.close(); }

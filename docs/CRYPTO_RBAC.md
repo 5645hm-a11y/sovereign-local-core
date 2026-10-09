@@ -1,10 +1,18 @@
 # Project encryption, certificate chains, and revocation
 
+Version 0.2.0 adds the `Kiosk` certificate role, email-free wallet credentials
+and opt-in root-signed native row write policies. Version-2 descriptors bind the
+immutable policy configuration; version-1 projects keep this original protocol.
+Only the root can grant Admin; delegated Admins may grant Member/Kiosk. The Worker
+verifies the full proof before passing a role to the C++ policy/state-machine
+reducer. This is write authorization, not per-row read encryption: members sharing
+the project key can decrypt all project events. See [policies and loans](POLICIES.md).
+
 ## Modules and boundary
 
 | Module | Responsibility |
 | --- | --- |
-| `certificates.ts` | Signed Admin/Member certificates, bounded chains, pinned root verification |
+| `certificates.ts` | Signed Admin/Member/Kiosk certificates, bounded chains, pinned root verification |
 | `project-crypto.ts` | AES-GCM fields, ECDH/HKDF key envelopes, signed invitation bundles |
 | `project.ts` | Authorized history evaluation, decryption, revocation filtering, current key epoch |
 | `project-storage.ts` | Persist public trust anchor and recipient-encrypted keys in OPFS |

@@ -1,8 +1,10 @@
 # NPM package and React integration
 
-The package exposes `sovereign-local-core` and the optional `sovereign-local-core/react` entry point.
+The package exposes `sovereign-local-core`, the optional `sovereign-local-core/react`
+entry point and, since version 0.2.0, `sovereign-local-core/nostr`.
 React is an optional peer dependency (`>=18 <20`); the core has no runtime NPM
-dependencies. The project is MIT licensed. GitHub release artifacts can be installed
+dependencies. The separate Nostr entry bundles pinned `@noble/secp256k1` with its
+MIT notice; importing core alone does not import that adapter. The project is MIT licensed. GitHub release artifacts can be installed
 directly; registry publication remains pending. See the repository README for the
 release download URL.
 
@@ -15,15 +17,17 @@ npm run build:package
 npm pack --pack-destination artifacts
 
 # Inside any external application, install the generated artifact:
-npm install /path/to/sovereign-local-core-0.1.0.tgz
+npm install /path/to/sovereign-local-core-0.2.0.tgz
 ```
 
 Create `artifacts` before using the last pack command if it does not exist.
 Building the library needs the existing Emscripten SDK; consumers need neither
 Emscripten nor a compiler. `scripts/build-package.mjs` uses esbuild to produce an
-ESM core entry, a separate React entry with a preserved `"use client"` directive,
+ESM core entry, separate Nostr entry, a React entry with a preserved `"use client"` directive,
 TypeScript declarations, and a standalone Worker. The browser Emscripten build
-excludes Node imports. ABI 1 and the existing native algorithm are unchanged.
+excludes Node imports. Base ABI 1 remains supported; version 0.2.0 adds optional
+policy/state-machine exports and versioned binary extensions. Build the Worker
+and WASM together. See [native policy contracts](POLICIES.md).
 
 The default NPM client starts an inline Blob Worker containing the native WASM
 bytes. The Worker compiles those bytes asynchronously without fetching any WASM,
@@ -51,8 +55,16 @@ One `useProject` owns one client. Share that handle with `ProjectProvider`; do n
 open another writer for the same actor/project/database in each child component.
 `useLiveQuery` and `useStorage` also accept an explicit handle, useful without a
 provider. `credentials` can be an inline object of primitive email/password fields;
-keep nested `invitation`, `clientOptions` and `p2p` configuration referentially stable
+keep nested `invitation`, `policies`, `clientOptions` and `p2p` configuration referentially stable
 with `useMemo` or constants to avoid reopening the project on each render.
+
+Version 0.2.0 also accepts email-free wallet credentials:
+`useProject(projectId, {mode: 'wallet', walletId, passphrase, createIfMissing: true,
+policies})`. `policies` must be stable and match the root-signed configuration;
+use `libraryPolicies` once outside render or in `useMemo`. Existing hook P2P options
+still use the legacy two-peer wrapper; attach `P2PWebRTC` explicitly to the ready
+client for a mesh and stop it in your effect cleanup. Wallet/API declarations,
+Kiosk invitations, CHECKOUT/RETURN, decisions and mesh options are consumer-typechecked.
 
 ```tsx
 'use client'; // Next.js App Router component
@@ -177,11 +189,13 @@ Strict Mode cleanup/reopen, real signaling/PeerConnection/DataChannel cleanup an
 a hosted Worker under `worker-src 'self'`. Next fixtures support both
 `npm run build` (Turbopack) and `npm run build:webpack`.
 
-Verified in this workspace: **57 unit tests**, **26 core browser tests**, and all
-**8 installed-package DX browser tests** passed, including task creation, editing,
+Verified in this workspace: **75 unit tests**, **30 core browser tests**, and all
+**9 installed-package DX browser tests** passed, including task creation, editing,
 reload recovery and cleanup in both public examples. Consumer TypeScript checks and
 Vite production/Next Turbopack production builds passed; the Next Webpack build
-was also exercised during integration. The tests use Chrome, React 19.3, Vite 8.3
+was also exercised during integration. The optional Nostr entry is checked during
+SSR import, consumer type checking and a production bundle under a nested base path.
+The tests use Chrome, React 19.3, Vite 8.3
 and Next 16.4; the React 18 peer range has not been separately exercised here.
 
 ## Public or private registry

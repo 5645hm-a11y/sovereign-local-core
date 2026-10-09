@@ -3,6 +3,8 @@ export type FieldValue = string | number | boolean | null;
 export type Fields = Readonly<Record<string, FieldValue>>;
 
 export type ItemCommand =
+  | { readonly type: "CHECKOUT"; readonly itemId: string; readonly fields: { readonly borrowerId: string } }
+  | { readonly type: "RETURN"; readonly itemId: string; readonly fields: { readonly checkoutId: string } }
   | { readonly type: "FILE_ADDED"; readonly itemId: string; readonly fields: Fields }
   | { readonly type: "ITEM_ADDED"; readonly itemId: string; readonly fields: Fields }
   | { readonly type: "ITEM_UPDATED"; readonly itemId: string; readonly fields: Fields }
@@ -10,11 +12,34 @@ export type ItemCommand =
 
 /** File manifests are data deltas, never governance or file-byte payloads. */
 export function isDataType(type: string): boolean {
-  return type === "ITEM_ADDED" || type === "ITEM_UPDATED" || type === "ITEM_DELETED" || type === "FILE_ADDED";
+  return type === "ITEM_ADDED" || type === "ITEM_UPDATED" || type === "ITEM_DELETED" || type === "FILE_ADDED" || type === "CHECKOUT" || type === "RETURN";
 }
 
 export interface Ciphertext { readonly iv: string; readonly ciphertext: string }
-export type Role = "Admin" | "Member";
+export type Role = "Admin" | "Member" | "Kiosk";
+export interface RowPolicy {
+  /** Immutable classification: longest matching item-ID prefix wins. */
+  readonly prefix: string;
+  readonly create: readonly Role[];
+  readonly update: readonly Role[];
+  readonly delete: readonly Role[];
+  readonly checkout: readonly Role[];
+  readonly return: readonly Role[];
+  /** Non-admin writes require this row field to equal the authenticated ActorID. */
+  readonly ownerField: string | null;
+  readonly library: boolean;
+}
+export interface ReducerPolicies {
+  readonly version: 1;
+  readonly defaultAllow: boolean;
+  readonly rules: readonly RowPolicy[];
+}
+export interface EventDecision {
+  readonly eventId: string;
+  readonly itemId: string;
+  readonly type: ItemCommand["type"];
+  readonly status: "ACCEPTED" | "REJECTED_CONFLICT" | "REJECTED_POLICY";
+}
 export interface Certificate {
   readonly version: 1;
   readonly projectId: string;
@@ -26,7 +51,9 @@ export interface Certificate {
   readonly signature: string;
 }
 export interface ProjectDescriptor {
-  readonly version: 1;
+  readonly version: 1 | 2;
+  /** Required and root-signed in descriptor v2; immutable for this project. */
+  readonly policies?: ReducerPolicies;
   readonly projectId: string;
   readonly rootActorId: string;
   readonly genesisKeyId: string;
@@ -71,7 +98,8 @@ export type UnsignedEvent = EventMetadata & EventBody;
 
 export type IEvent = UnsignedEvent & { readonly signature: string };
 
-export interface IdentityOpenOptions {
+export interface EmailIdentityOpenOptions {
+  readonly mode?: never;
   readonly email: string;
   readonly password: string;
   readonly projectId: string;
@@ -79,7 +107,20 @@ export interface IdentityOpenOptions {
   readonly invitation?: ProjectInvitation;
   /** Defaults to a hash of the normalized email; demos use explicit isolated vault names. */
   readonly vaultName?: string;
+  readonly policies?: ReducerPolicies;
 }
+export interface WalletOpenOptions {
+  readonly mode: "wallet";
+  readonly walletId: string;
+  readonly passphrase: string;
+  readonly projectId: string;
+  readonly invitation?: ProjectInvitation;
+  readonly vaultName?: string;
+  readonly policies?: ReducerPolicies;
+}
+export type IdentityOpenOptions = EmailIdentityOpenOptions | WalletOpenOptions;
+export type IdentityCredentials = Omit<EmailIdentityOpenOptions, "projectId" | "invitation" | "policies"> |
+  Omit<WalletOpenOptions, "projectId" | "invitation" | "policies">;
 
 export interface ItemView {
   readonly id: string;
@@ -91,6 +132,8 @@ export interface Snapshot {
   readonly schemaVersion: 1;
   readonly lamport: number;
   readonly items: readonly ItemView[];
+  /** Present for policy projects; outcomes may change when older events arrive. */
+  readonly decisions?: readonly EventDecision[];
 }
 
 export interface RecoveryReport {

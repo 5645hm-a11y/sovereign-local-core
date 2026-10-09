@@ -1,6 +1,7 @@
 import { BinaryReader } from "./binary-codec.js";
 import { commandDictionaries } from "./binary-command.js";
-import type { FieldValue, Snapshot } from "./types.js";
+import type { EventDecision, FieldValue, ReducerPolicies, Role, Snapshot } from "./types.js";
+import { encodePolicies, roleCode } from "./policies.js";
 import type { PlainItemEvent } from "./project.js";
 
 const ABI = 1, INPUT_MAGIC = 0x31574353, OUTPUT_MAGIC = 0x314f4353;
@@ -17,6 +18,8 @@ interface Runtime {
   _core_session_create(): number;
   _core_session_destroy(handle: number): void;
   _core_session_apply(handle: number, pointer: number, bytes: number): number;
+  _core_session_apply_authorized(handle: number, pointer: number, bytes: number, role: number): number;
+  _core_session_configure(handle: number, pointer: number, bytes: number): number;
   _core_session_snapshot(handle: number): number;
   _core_session_checkpoint(handle: number): number;
   _core_session_restore(handle: number, pointer: number, bytes: number): number;
@@ -145,7 +148,7 @@ function decodeSnapshot(runtime: Runtime, lamport: number, itemNames: readonly s
 }
 
 export class NativeMergeError extends Error {
-  constructor(readonly status: number) { super(status === 2 ? "WASM projection allocation failed" : "Invalid WASM projection input"); this.name = "NativeMergeError"; }
+  constructor(readonly status: number) { super(status === 2 ? "WASM projection allocation failed" : status === 3 ? "Native row policy denied the operation" : "Invalid WASM projection input"); this.name = "NativeMergeError"; }
 }
 /** Prepared buffers are synchronous leases; snapshot output is valid until the next native call. */
 export interface PreparedProjection {
@@ -245,11 +248,16 @@ export class WasmProjection {
 /** Persistent native registers: binary deltas are copied once into a reusable WASM arena. */
 export class BinaryProjection {
   private pointer = 0; private capacity = 0; private closed = false;
-  private constructor(private readonly runtime: Runtime, private readonly handle: number) {}
-  static async create(): Promise<BinaryProjection> {
-    const runtime = await loadWasmRuntime(), handle = runtime._core_session_create();
+  private constructor(private readonly runtime: Runtime, private readonly handle: number, private readonly policyEnabled: boolean) {}
+  static async create(policies?: ReducerPolicies): Promise<BinaryProjection> {
+    const runtime = await loadWasmRuntime();
+    if (policies && (typeof runtime._core_session_configure !== "function" || typeof runtime._core_session_apply_authorized !== "function")) throw new Error("Policy ABI missing; rebuild and deploy the matching WASM/Worker");
+    const handle = runtime._core_session_create();
     if (!handle) throw new NativeMergeError(2);
-    return new BinaryProjection(runtime, handle);
+    const projection = new BinaryProjection(runtime, handle, policies !== undefined);
+    try { if (policies) projection.input(encodePolicies(policies), (p, n) => runtime._core_session_configure(handle, p, n)); }
+    catch (error) { projection.close(); throw error; }
+    return projection;
   }
   private status(value: number): void {
     diagnostics.mergeCalls++; diagnostics.memoryBytes = this.runtime.HEAPU8.byteLength;
@@ -275,6 +283,24 @@ export class BinaryProjection {
   apply(block: Uint8Array): void {
     this.input(block, (pointer, size) => this.runtime._core_session_apply(this.handle, pointer, size));
     diagnostics.projectedEvents += new DataView(block.buffer, block.byteOffset).getUint32(8, true);
+  }
+  /** Roles are supplied only after Worker signature, certificate and revocation checks. */
+  applyAuthorized(blocks: readonly Uint8Array[], roles: readonly Role[]): void {
+    if (blocks.length !== roles.length) throw new TypeError("Native command/proof count mismatch");
+    if (!this.policyEnabled) { this.applyAll(blocks); return; }
+    if (!blocks.length) return;
+    if (blocks.length > 100000) throw new RangeError("Policy reducer exceeds 100,000 candidates");
+    const codes = roles.map(roleCode), size = blocks.reduce((n, b) => n + 8 + b.length, 16);
+    this.reserve(size);
+    const v = new DataView(this.runtime.HEAPU8.buffer, this.pointer, size);
+    v.setUint32(0, 0x32424353, true); v.setUint32(4, 2, true); v.setUint32(8, blocks.length, true); v.setUint32(12, size, true);
+    let at = 16;
+    for (let i = 0; i < blocks.length; i++) {
+      v.setUint32(at, codes[i]!, true); v.setUint32(at + 4, blocks[i]!.length, true); at += 8;
+      this.runtime.HEAPU8.set(blocks[i]!, this.pointer + at); at += blocks[i]!.length;
+    }
+    try { this.status(this.runtime._core_session_apply_authorized(this.handle, this.pointer, size, 0)); diagnostics.projectedEvents += blocks.length; }
+    finally { this.runtime.HEAPU8.fill(0, this.pointer, this.pointer + size); this.runtime._core_clear_output(); }
   }
   applyAll(blocks: readonly Uint8Array[]): void {
     if (blocks.length === 1) { this.apply(blocks[0]!); return; }
@@ -310,7 +336,9 @@ export class BinaryProjection {
     this.status(this.runtime._core_session_snapshot(this.handle));
     try {
       const r = new BinaryReader(new Uint8Array(this.runtime.HEAPU8.buffer, this.runtime._core_output_ptr(), this.runtime._core_output_size()));
-      if (r.u32() !== 0x31564f53 || r.u32() !== 1) throw new Error("Invalid session snapshot");
+      if (r.u32() !== 0x31564f53) throw new Error("Invalid session snapshot");
+      const version = r.u32();
+      if (version !== (this.policyEnabled ? 2 : 1)) throw new Error("Native policy snapshot mismatch");
       const count = r.u32(); if (r.u32() !== r.bytes.length || count > MAX_EVENTS) throw new Error("Invalid snapshot length");
       const items: Snapshot["items"][number][] = [];
       for (let i = 0; i < count; i++) {
@@ -323,7 +351,18 @@ export class BinaryProjection {
         }
         items.push(Object.freeze({ id, fields: Object.freeze(fields) }));
       }
-      r.done(); return Object.freeze({ schemaVersion: 1, lamport, items: Object.freeze(items) });
+      const decisions: EventDecision[] = [];
+      if (version === 2) {
+        const count = r.u32(); if (count > 100000) throw new Error("Invalid decision count");
+        for (let i = 0; i < count; i++) {
+          const eventId = r.string(), itemId = r.string(), type = r.u32(), status = r.u32();
+          const command = ["ITEM_ADDED", "ITEM_UPDATED", "ITEM_DELETED", "CHECKOUT", "RETURN"][type - 1] as EventDecision["type"] | undefined;
+          const outcome = ["ACCEPTED", "REJECTED_CONFLICT", "REJECTED_POLICY"][status - 1] as EventDecision["status"] | undefined;
+          if (!command || !outcome) throw new Error("Invalid native decision");
+          decisions.push(Object.freeze({ eventId, itemId, type: command, status: outcome }));
+        }
+      }
+      r.done(); return Object.freeze({ schemaVersion: 1, lamport, items: Object.freeze(items), ...(version === 2 ? { decisions: Object.freeze(decisions) } : {}) });
     } finally { this.runtime._core_clear_output(); }
   }
   close(): void {

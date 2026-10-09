@@ -7,11 +7,18 @@ export { LocalEventStore } from "./local-store.js";
 export { openOPFSStore } from "./opfs.js";
 export { LogCorruptionError, UncertainCommitError } from "./framed-log.js";
 export { P2PSync } from "./p2p-sync.js";
+export { SyncSession } from "./sync-session.js";
+export type { ByteLink, SyncSessionOptions } from "./sync-session.js";
+export { P2PWebRTC, GOOGLE_STUN_SERVERS } from "./p2p-webrtc.js";
+export type { P2PWebRTCOptions, MeshPeer } from "./p2p-webrtc.js";
+export type { IDiscoveryProvider, IDiscoveryCore, DiscoverySignal, VerifiedDiscoverySignal } from "./discovery-provider.js";
 export type { P2PState, P2PSyncOptions, P2PStats } from "./p2p-sync.js";
 export { createIdentityVault, unlockIdentityVault, signEvent, verifySignature,
   IdentityUnlockError, InvalidEventSignatureError, EventProjectMismatchError, PBKDF2_ITERATIONS } from "./identity.js";
 export type { IdentityVault, UnlockedIdentity } from "./identity.js";
 export { ProjectContext } from "./project.js";
+export { libraryPolicies, normalizePolicies } from "./policies.js";
+export { createWalletVault, unlockWalletVault } from "./identity.js";
 export { AuthorizationError, issueCertificate, verifyCertificate, verifyDescriptor } from "./certificates.js";
 export { ProjectNotInitializedError } from "./project-storage.js";
 export { StorageEngine, fileChunks } from "./storage.js";

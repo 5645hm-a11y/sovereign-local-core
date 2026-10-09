@@ -4,6 +4,13 @@ The public `LocalCoreClient` API and `ICRDTMerge` are unchanged. Item production
 encrypted event storage and WebRTC application messages are binary. The Worker
 keeps a persistent C++20/WASM projection and normally applies only new item events.
 
+Version 0.2.0 adds opt-in root-signed row policies and conditional CHECKOUT/RETURN.
+The default LWW path described below keeps its existing formats and incremental
+behavior. Policy projects use additive exports and versioned command/view/checkpoint
+extensions; they retain candidates and replay their deterministic order, including
+on checkpoint restore. The old performance measurements do not describe that path.
+See [native policies, ABI extensions and costs](POLICIES.md).
+
 ## Modules
 
 | Module | Responsibility |
@@ -15,6 +22,7 @@ keeps a persistent C++20/WASM projection and normally applies only new item even
 | `project.ts` | Incremental item authorization, full governance evaluation, owner cache-key derivation |
 | `native/core_engine.cpp` | Stateless ABI-1 reducer and validation primitives |
 | `native/core_session.inc` | Persistent registers, staged updates, binary checkpoints and restore |
+| `native/core_policy.inc` / `policies.ts` | Authenticated-role policies, conditional replay and candidate checkpoints |
 | `wasm-loader.ts` | Async loading, reusable linear-memory arenas, native sessions |
 | `checkpoints.ts` | Owner-encrypted/signed, alternating OPFS checkpoint slots |
 | `engine.ts` | Serialized durable publication, delta replay, checkpoint scheduling |

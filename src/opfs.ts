@@ -42,22 +42,23 @@ export async function openOPFSStore(databaseName: string, actorId: string, proje
       }
       journal = new CheckpointJournal(checkpointHandles as [SyncFile, SyncFile], project);
       return await LocalEventStore.open(handle, { actorId, projectId }, release, async (events, cp) => {
-        const native = await BinaryProjection.create();
+        const native = await BinaryProjection.create(project.descriptor.policies);
         let blocks: readonly Uint8Array<ArrayBuffer>[] = [];
+        let roles: readonly import("./types.js").Role[] = [];
         try {
           if (cp && events.every(e => isDataType(e.type))) {
             native.restore(cp.native);
             const policy = await project.restorePolicy(cp.controls, cp.certificates);
-            blocks = (await project.extend(policy, events)).blocks;
+            const state = await project.extend(policy, events); blocks = state.blocks; roles = state.roles;
           } else {
             const history: IEvent[] = [];
             if (cp) inspectFrames(handle, value => {
               const record = value as { kind: string; event: unknown };
               if (record.kind === "event") history.push(normalizeEvent(record.event));
             });
-            blocks = (await project.evaluateBinary(cp ? history : events)).blocks;
+            const state = await project.evaluateBinary(cp ? history : events); blocks = state.blocks; roles = state.roles;
           }
-          native.applyAll(blocks); // Native scalar/record validation precedes incomplete-tail repair.
+          native.applyAuthorized(blocks, roles); // Native scalar and RLS checks precede incomplete-tail repair.
         } finally { for (const block of blocks) block.fill(0); native.close(); }
       }, journal);
     } catch (error) {

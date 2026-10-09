@@ -3,6 +3,7 @@ import { normalizeEvent } from "./validation.js";
 import { P2PStorage } from "./storage-client.js";
 import type { FileManifest, ChunkRequest, UploadOptions } from "./storage-format.js";
 import { createCoreWorker, type LocalCoreClientOptions } from "./worker-factory.js";
+import type { DiscoverySignal, VerifiedDiscoverySignal } from "./discovery-provider.js";
 export type { LocalCoreClientOptions } from "./worker-factory.js";
 
 export interface OpenResult { actorId: string; projectId: string; recovery: RecoveryReport; snapshot: Snapshot }
@@ -51,10 +52,13 @@ export class LocalCoreClient implements ISyncCore {
 
   open(databaseName: string, options: IdentityOpenOptions): Promise<OpenResult> { return this.call("open", { databaseName, options }); }
   createProject(databaseName: string, options: IdentityOpenOptions): Promise<OpenResult> { return this.call("createProject", { databaseName, options }); }
-  identify(options: Omit<IdentityOpenOptions, "projectId" | "invitation">): Promise<{ actorId: string }> { return this.call("identify", { options }); }
+  identify(options: import("./types.js").IdentityCredentials): Promise<{ actorId: string }> { return this.call("identify", { options }); }
   inviteMember(actorId: string, role: Role = "Member"): Promise<{ invitation: ProjectInvitation; event: IEvent; snapshot: Snapshot }> { return this.call("inviteMember", { actorId, role }); }
   revokeMember(actorId: string): Promise<{ event: IEvent; snapshot: Snapshot }> { return this.call("revokeMember", { actorId }); }
   getProjectInfo(): Promise<{ descriptor: ProjectDescriptor; certificate: Certificate; currentKeyId: string }> { return this.call("getProjectInfo"); }
+  getDiscoveryInfo(): Promise<{ topic: string; keyId: string; actorId: string }> { return this.call("getDiscoveryInfo"); }
+  sealDiscovery(signal: DiscoverySignal): Promise<Uint8Array<ArrayBuffer>> { return this.call("sealDiscovery", { signal }); }
+  openDiscovery(packet: Uint8Array<ArrayBuffer>): Promise<VerifiedDiscoverySignal> { return this.call("openDiscovery", { packet }); }
   dispatch(command: ItemCommand): Promise<{ event: IEvent; snapshot: Snapshot }> {
     return this.call("dispatch", { command });
   }

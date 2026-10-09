@@ -1,5 +1,14 @@
 # Password-protected identity vault
 
+Version 0.2.0 supports an email-free sovereign wallet using
+`{mode: 'wallet', walletId, passphrase}` in `identify`, `open` and `createProject`.
+`createWalletVault` and `unlockWalletVault` use the same encrypted envelope and
+random keys described below, with the domain-separated selector
+`sovereign-wallet/v1:<walletId>` instead of normalized email. Wallet IDs are local
+ASCII identifiers of 1–128 characters, not verified identities or global names.
+See [wallets and root-signed policies](POLICIES.md). Email APIs remain compatible;
+the email-specific tuples/filenames below describe that existing mode.
+
 The current project encryption/permission protocol is described in
 [CRYPTO_RBAC.md](CRYPTO_RBAC.md). Identity vaults retain their version-1 envelope;
 event logs use encrypted, authorized schema version 3. New event signatures cover

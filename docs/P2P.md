@@ -1,5 +1,13 @@
 # Two-peer P2P synchronization, binary protocol v2
 
+This page describes the retained `P2PSync` WebSocket signaling API. Since version
+0.2.0 it delegates synchronization to `SyncSession`; encrypted public
+Nostr discovery uses the new `P2PWebRTC` wrapper. See [DISCOVERY.md](DISCOVERY.md).
+The wire format, external legacy API and native ABI remain compatible.
+`P2PWebRTC` now manages multiple independent edges and enables durable imported-event
+forwarding for sparse meshes. The legacy wrapper remains two-peer/local-commit-only;
+see [mesh and native business contracts](POLICIES.md).
+
 ## Boundaries
 
 `P2PSync` uses `ISyncCore`, normally implemented by `LocalCoreClient`. It does not
@@ -143,8 +151,9 @@ to 2 MiB; stored records retain the local log's 1 MiB limit.
 Sending pauses above 256 KiB buffered data and resumes at 64 KiB. A stalled channel,
 closed channel or missing durable ACK fails the session rather than pretending data
 was saved. The ACK timeout defaults to 15 seconds. Application dispatch can outpace
-network throughput; this prototype's pending live work is memory-resident, with the
-durable log providing recovery if the process exits. Large-scale queue coalescing,
+network throughput; the shared session now caps pending live sends at 32 operations
+and closes on overflow, with the durable log providing recovery on reconnect.
+Large-scale queue coalescing,
 streaming disk iteration and bandwidth scheduling are not implemented yet.
 
 ## On-demand file chunks

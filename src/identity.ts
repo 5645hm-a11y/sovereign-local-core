@@ -81,7 +81,20 @@ async function deriveVaultKey(email: string, password: string, salt: string): Pr
 }
 
 export async function createIdentityVault(emailInput: string, password: string): Promise<{ vault: IdentityVault; identity: UnlockedIdentity }> {
-  const email = normalizeEmail(emailInput); passwordInput(password);
+  return createVault(normalizeEmail(emailInput), password);
+}
+export function normalizeWalletId(value: unknown): string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw new TypeError("Wallet ID must be 1–128 ASCII letters, digits, _ or -");
+  return value;
+}
+export function createWalletVault(walletId: string, passphrase: string): Promise<{ vault: IdentityVault; identity: UnlockedIdentity }> {
+  return createVault(`sovereign-wallet/v1:${normalizeWalletId(walletId)}`, passphrase);
+}
+export function unlockWalletVault(vault: unknown, walletId: string, passphrase: string): Promise<UnlockedIdentity> {
+  return unlockVault(vault, `sovereign-wallet/v1:${normalizeWalletId(walletId)}`, passphrase);
+}
+async function createVault(email: string, password: string): Promise<{ vault: IdentityVault; identity: UnlockedIdentity }> {
+  passwordInput(password);
   const pair = await crypto.subtle.generateKey(algorithm, true, ["sign", "verify"]);
   const raw = await crypto.subtle.exportKey("raw", pair.publicKey);
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
@@ -104,8 +117,11 @@ export async function createIdentityVault(emailInput: string, password: string):
 }
 
 export async function unlockIdentityVault(value: unknown, emailInput: string, password: string): Promise<UnlockedIdentity> {
+  return unlockVault(value, normalizeEmail(emailInput), password);
+}
+async function unlockVault(value: unknown, email: string, password: string): Promise<UnlockedIdentity> {
   const vault = normalizeVault(value);
-  const email = normalizeEmail(emailInput); passwordInput(password);
+  passwordInput(password);
   const key = await deriveVaultKey(email, password, vault.salt);
   let plaintext: Uint8Array<ArrayBuffer> | undefined;
   let privateBytes: Uint8Array<ArrayBuffer> | undefined;

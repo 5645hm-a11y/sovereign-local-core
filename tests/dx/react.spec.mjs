@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { startSignalingServer } from "../../scripts/signaling-server.mjs";
 import { WebSocket } from "ws";
+import { startMockNostrRelay } from "../helpers/mock-nostr-relay.mjs";
+test("installed optional Nostr entry bundles beneath a production base path", async ({ page }) => {
+  const relay = await startMockNostrRelay();
+  try {
+    await page.goto("http://127.0.0.1:4181/demo/");
+    await expect(page.getByTestId("project-status")).toContainText("Ready");
+    const result = await page.evaluate(url => window.probeNostr(url), relay.url);
+    expect(result).toMatchObject({ equal: true, published: 1, received: 1, rejected: 0 });
+    expect(relay.events).toHaveLength(1); expect(relay.errors).toEqual([]);
+  } finally { await relay.close(); }
+});
 test("project unmount closes real signaling, PeerConnection and DataChannel", async ({ page }) => {
   const server = await startSignalingServer({ port: 0 }), roomId = crypto.randomUUID();
   let remote;

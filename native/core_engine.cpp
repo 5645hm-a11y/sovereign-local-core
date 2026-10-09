@@ -208,6 +208,7 @@ void merge(const uint8_t* buffer, uint32_t size) {
   for (unsigned i = 0; i < 4; ++i) output[12 + i] = uint8_t(bytes >> (i * 8));
 }
 #include "core_session.inc"
+#include "core_policy.inc"
 } // namespace
 
 extern "C" {
@@ -217,14 +218,23 @@ uint32_t core_session_create() {
 }
 void core_session_destroy(uint32_t id) { sessions.erase(id); }
 uint32_t core_session_apply(uint32_t id, const uint8_t* buffer, uint32_t size) {
-  return with_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; apply_session(s, buffer, size); });
+  return with_session(id, [&](auto& s) { if (!heap_input(buffer, size) || s.business) throw InvalidInput{}; apply_session(s, buffer, size); });
 }
-uint32_t core_session_snapshot(uint32_t id) { return with_session(id, [&](auto& s) { snapshot_session(s); }); }
-uint32_t core_session_checkpoint(uint32_t id) { return with_session(id, [&](auto& s) { checkpoint_session(s); }); }
+uint32_t core_session_configure(uint32_t id, const uint8_t* buffer, uint32_t size) {
+  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; configure_business(s, buffer, size); });
+}
+uint32_t core_session_apply_authorized(uint32_t id, const uint8_t* buffer, uint32_t size, uint32_t role) {
+  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; apply_authorized(s, buffer, size, role); });
+}
+uint32_t core_session_snapshot(uint32_t id) { return with_authorized_session(id, [&](auto& s) { snapshot_business(s); }); }
+uint32_t core_session_checkpoint(uint32_t id) { return with_authorized_session(id, [&](auto& s) { checkpoint_business(s); }); }
 uint32_t core_session_restore(uint32_t id, const uint8_t* buffer, uint32_t size) {
-  return with_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; auto state = restore_session(buffer, size); s.items.swap(state); });
+  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; restore_business(s, buffer, size); });
 }
-uint32_t core_session_reset(uint32_t id) { return with_session(id, [&](auto& s) { s.items.clear(); }); }
+uint32_t core_session_reset(uint32_t id) { return with_session(id, [&](auto& s) {
+  if (s.business) { auto next = std::make_shared<BusinessState>(); next->policy = s.business->policy; s.business.swap(next); }
+  s.items.clear();
+}); }
 // Status: 0 success; 1 invalid input/size; 2 allocation failure. No partial output on failure.
 uint32_t core_merge(const uint8_t* buffer, uint32_t size) {
   clear_output();

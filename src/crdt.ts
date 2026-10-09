@@ -12,6 +12,7 @@ function compareStamp(a: Stamp, b: Stamp): number { return a.lamport - b.lamport
 export function projectItemsReference(events: readonly PlainItemEvent[], lamport: number): Snapshot {
   const items = new Map<string, ItemState>();
   for (const event of events) {
+    if (event.type === "CHECKOUT" || event.type === "RETURN") throw new Error("Business operations require the policy reducer");
     const stamp = { lamport: event.lamport, actorId: event.actorId, sequence: event.sequence };
     const item = items.get(event.itemId) ?? { fields: new Map<string, Register<FieldValue>>() };
     if (event.type !== "ITEM_UPDATED" && (!item.existence || compareStamp(stamp, item.existence.stamp) > 0)) item.existence = { stamp, value: event.type !== "ITEM_DELETED" };
@@ -39,8 +40,8 @@ export class EventMaterializer {
       if (previous) await this.project.verifyEvent(event);
       const state = await this.project.evaluateBinary(events);
       if (!state.eligible.has(event.id)) throw new Error("Event permission revoked");
-      const native = await BinaryProjection.create();
-      try { native.applyAll(state.blocks); this.view = native.snapshot(events.reduce((clock, e) => Math.max(clock, e.lamport), this.project.certificate.issuedLamport)); }
+      const native = await BinaryProjection.create(this.project.descriptor.policies);
+      try { native.applyAuthorized(state.blocks, state.roles); this.view = native.snapshot(events.reduce((clock, e) => Math.max(clock, e.lamport), this.project.certificate.issuedLamport)); }
       finally { for (const block of state.blocks) block.fill(0); native.close(); }
       this.events = events;
     });
@@ -61,8 +62,8 @@ export class LWWMerge implements ICRDTMerge {
     const state = await this.project.evaluateBinary([...seen.values()]);
     // Verify duplicate signatures too, without duplicating governance operations.
     if (seen.size !== events.length) for (const event of events) await this.project.verifyEvent(event);
-    const native = await BinaryProjection.create();
-    try { native.applyAll(state.blocks); return native.snapshot(events.reduce((clock, e) => Math.max(clock, e.lamport), this.project.certificate.issuedLamport)); }
+    const native = await BinaryProjection.create(this.project.descriptor.policies);
+    try { native.applyAuthorized(state.blocks, state.roles); return native.snapshot(events.reduce((clock, e) => Math.max(clock, e.lamport), this.project.certificate.issuedLamport)); }
     finally { for (const block of state.blocks) block.fill(0); native.close(); }
   }
 }

@@ -64,10 +64,19 @@ function commandParts(input: Record<string, unknown>): ItemCommand {
   if (input.type === "ITEM_DELETED") {
     return { type: input.type, itemId };
   }
-  if (input.type !== "ITEM_ADDED" && input.type !== "ITEM_UPDATED" && input.type !== "FILE_ADDED") {
+  if (input.type !== "ITEM_ADDED" && input.type !== "ITEM_UPDATED" && input.type !== "FILE_ADDED" && input.type !== "CHECKOUT" && input.type !== "RETURN") {
     throw new TypeError("Unsupported event type");
   }
   const normalized = fields(input.fields);
+  if (input.type === "CHECKOUT") {
+    keys(normalized, ["borrowerId"]);
+    return { type: input.type, itemId, fields: { borrowerId: identifier(normalized.borrowerId, "borrowerId") } };
+  }
+  if (input.type === "RETURN") {
+    keys(normalized, ["checkoutId"]);
+    if (typeof normalized.checkoutId !== "string" || !/^p256_[A-Za-z0-9_-]{87}:[1-9][0-9]{0,15}$/.test(normalized.checkoutId)) throw new TypeError("Invalid checkout event ID");
+    return { type: input.type, itemId, fields: { checkoutId: normalized.checkoutId } };
+  }
   if (input.type === "FILE_ADDED") {
     keys(normalized, ["manifest", "storageType"]);
     if (manifestFromFields(normalized).fileId !== itemId) throw new TypeError("File manifest ID mismatch");
@@ -116,7 +125,7 @@ export function normalizeUnsignedEvent(value: unknown): UnsignedEvent {
     return Object.freeze({ ...metadata, type: input.type, revocation: Object.freeze({ targetActorId: normalizeActorId(r.targetActorId),
       keyId: normalizeKeyId(r.keyId), allowedHistory: Object.freeze(allowedHistory), envelopes: Object.freeze(r.envelopes.map(normalizeEnvelope)) }) });
   }
-  if (!["ITEM_ADDED", "ITEM_UPDATED", "ITEM_DELETED", "FILE_ADDED"].includes(input.type as string)) throw new TypeError("Unsupported event type");
+  if (!["ITEM_ADDED", "ITEM_UPDATED", "ITEM_DELETED", "FILE_ADDED", "CHECKOUT", "RETURN"].includes(input.type as string)) throw new TypeError("Unsupported event type");
   return Object.freeze({ ...metadata, type: input.type as ItemCommand["type"], itemId: identifier(input.itemId, "itemId"),
     keyId: normalizeKeyId(input.keyId), encryptedFields: normalizeCiphertext(input.encryptedFields) });
 }

@@ -2,6 +2,7 @@ import { encodeBinary } from "./binary-codec.js";
 import { fromBase64Url, normalizeActorId, normalizeProjectId, toBase64Url } from "./crypto-codec.js";
 import type { Certificate, ProjectDescriptor, Role } from "./types.js";
 import type { UnlockedIdentity } from "./identity.js";
+import { normalizePolicies } from "./policies.js";
 
 const encoder = new TextEncoder();
 const signing = { name: "ECDSA", hash: "SHA-256" };
@@ -17,7 +18,7 @@ export function exactObject(value: unknown, expected: string[]): Record<string, 
 export function normalizeCertificate(value: unknown, depth = 0): Certificate {
   if (depth > 8) throw new TypeError("Certificate chain exceeds eight delegations");
   const c = exactObject(value, ["version", "projectId", "subject", "issuer", "role", "issuedLamport", "parent", "signature"]);
-  if (c.version !== 1 || !["Admin", "Member"].includes(c.role as string) ||
+  if (c.version !== 1 || !["Admin", "Member", "Kiosk"].includes(c.role as string) ||
       !Number.isSafeInteger(c.issuedLamport) || (c.issuedLamport as number) < 0) throw new TypeError("Invalid certificate");
   fromBase64Url(c.signature, 64);
   return Object.freeze({ version: 1, projectId: normalizeProjectId(c.projectId), subject: normalizeActorId(c.subject),
@@ -37,13 +38,18 @@ export async function issueCertificate(identity: UnlockedIdentity, projectId: st
   return normalizeCertificate({ ...normalized, signature: toBase64Url(signature) });
 }
 export function normalizeDescriptor(value: unknown): ProjectDescriptor {
-  const d = exactObject(value, ["version", "projectId", "rootActorId", "genesisKeyId", "rootCertificate", "signature"]);
-  if (d.version !== 1 || typeof d.genesisKeyId !== "string" || !/^key_[A-Za-z0-9_-]{43}$/.test(d.genesisKeyId)) throw new TypeError("Invalid project descriptor");
+  const version = (value as { version?: unknown } | null)?.version;
+  const d = exactObject(value, ["version", "projectId", "rootActorId", "genesisKeyId", "rootCertificate", "signature", ...(version === 2 ? ["policies"] : [])]);
+  if ((d.version !== 1 && d.version !== 2) || typeof d.genesisKeyId !== "string" || !/^key_[A-Za-z0-9_-]{43}$/.test(d.genesisKeyId)) throw new TypeError("Invalid project descriptor");
   fromBase64Url(d.signature, 64);
-  return Object.freeze({ version: 1, projectId: normalizeProjectId(d.projectId), rootActorId: normalizeActorId(d.rootActorId),
+  return Object.freeze({ version: d.version, ...(d.version === 2 ? { policies: normalizePolicies(d.policies) } : {}), projectId: normalizeProjectId(d.projectId), rootActorId: normalizeActorId(d.rootActorId),
     genesisKeyId: d.genesisKeyId, rootCertificate: normalizeCertificate(d.rootCertificate), signature: d.signature as string });
 }
-function descriptorText(d: ProjectDescriptor): string { return toBase64Url(encodeBinary(["sovereign-local-core/project/v1", d.version, d.projectId, d.rootActorId, d.genesisKeyId, certificateTuple(d.rootCertificate), d.rootCertificate.signature])); }
+function descriptorTuple(d: ProjectDescriptor): unknown[] {
+  return [d.version === 2 ? "sovereign-local-core/project/v2" : "sovereign-local-core/project/v1", d.version, d.projectId,
+    d.rootActorId, d.genesisKeyId, certificateTuple(d.rootCertificate), d.rootCertificate.signature, ...(d.version === 2 ? [d.policies] : [])];
+}
+function descriptorText(d: ProjectDescriptor): string { return toBase64Url(encodeBinary(descriptorTuple(d))); }
 export async function signDescriptor(value: ProjectDescriptor, identity: UnlockedIdentity): Promise<ProjectDescriptor> {
   if (value.rootActorId !== identity.actorId) throw new AuthorizationError();
   const signature = toBase64Url(await crypto.subtle.sign(signing, identity.privateKey, encoder.encode(descriptorText(value))));
@@ -54,7 +60,7 @@ export async function verifyDescriptor(value: unknown): Promise<ProjectDescripto
   await verifyCertificate(d.rootCertificate, d);
   const key = await crypto.subtle.importKey("raw", fromBase64Url(d.rootActorId.slice(5), 65), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
   if (!await crypto.subtle.verify(signing, key, fromBase64Url(d.signature, 64), encoder.encode(descriptorText(d))) &&
-      !await crypto.subtle.verify(signing, key, fromBase64Url(d.signature, 64), encoder.encode(JSON.stringify(["sovereign-local-core/project/v1", d.version, d.projectId, d.rootActorId, d.genesisKeyId, certificateTuple(d.rootCertificate), d.rootCertificate.signature])))) throw new AuthorizationError("Invalid project descriptor signature");
+      !(d.version === 1 && await crypto.subtle.verify(signing, key, fromBase64Url(d.signature, 64), encoder.encode(JSON.stringify(descriptorTuple(d)))))) throw new AuthorizationError("Invalid project descriptor signature");
   return d;
 }
 export async function verifyCertificate(value: unknown, descriptor: ProjectDescriptor): Promise<Certificate> {

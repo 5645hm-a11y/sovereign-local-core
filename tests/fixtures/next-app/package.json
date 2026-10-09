@@ -10,6 +10,6 @@
     "next": "^16.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "sovereign-local-core": "file:../../../artifacts/sovereign-local-core-0.1.0.tgz"
+    "sovereign-local-core": "file:../../../artifacts/sovereign-local-core-0.2.0.tgz"
   }
 }

@@ -135,7 +135,7 @@ export async function decryptCommand(value: Ciphertext, aad: Uint8Array<ArrayBuf
   try {
     const metadata = commandMetadata(aad);
     requireCommandBinding(plaintext, metadata);
-    if (metadata.type === "FILE_ADDED") normalizeCommand({ type: metadata.type, itemId: metadata.itemId, fields: decodeCommandFields(plaintext) });
+    if (metadata.type === "FILE_ADDED" || metadata.type === "CHECKOUT" || metadata.type === "RETURN") normalizeCommand({ type: metadata.type, itemId: metadata.itemId, fields: decodeCommandFields(plaintext) });
     return plaintext;
   }
   catch (error) { plaintext.fill(0); throw error; }

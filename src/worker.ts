@@ -32,6 +32,7 @@ scope.onmessage = (message) => {
       actorId?: string; role?: import("./types.js").Role;
       blob?: Blob; uploadOptions?: import("./storage.js").UploadOptions; fileId?: string; index?: number;
       bytes?: Uint8Array<ArrayBuffer>; chunkRequest?: import("./storage.js").ChunkRequest; manifestDigest?: string;
+      signal?: import("./discovery-provider.js").DiscoverySignal; packet?: Uint8Array<ArrayBuffer>;
     };
     try {
       let result: unknown;
@@ -41,7 +42,7 @@ scope.onmessage = (message) => {
       } else if (request.method === "open" || request.method === "createProject") {
         await wasmReady;
         if (core) throw new Error("Worker already owns a database");
-        if (!request.options) throw new TypeError("Email, password and projectId are required");
+        if (!request.options) throw new TypeError("Identity credentials and projectId are required");
         const projectId = normalizeProjectId(request.options.projectId);
         const identity = await openIdentityVault(request.options);
         const databaseName = request.databaseName ?? "local-core";
@@ -57,6 +58,9 @@ scope.onmessage = (message) => {
           case "dispatch": result = await core.dispatch(normalizeCommand(request.command)); break;
           case "snapshot": result = await core.snapshot(); break;
           case "getProjectInfo": result = await core.getProjectInfo(); break;
+          case "getDiscoveryInfo": result = await core.getDiscoveryInfo(); break;
+          case "sealDiscovery": result = await core.sealDiscovery(request.signal!); break;
+          case "openDiscovery": result = await core.openDiscovery(request.packet!); break;
           case "inviteMember": result = await core.inviteMember(request.actorId!, request.role); break;
           case "revokeMember": result = await core.revokeMember(request.actorId!); break;
           case "readEvents": result = await core.readEvents(); break;

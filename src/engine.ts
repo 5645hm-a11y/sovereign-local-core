@@ -11,8 +11,13 @@ import { normalizeChunkRequest, requestBytes, type ChunkRequest } from "./storag
 import { encryptFields, fieldsAAD, generateProjectKey, wrapProjectKey } from "./project-crypto.js";
 import { payloadDigest, ProjectContext, type ProjectEvaluation } from "./project.js";
 import { isDataType } from "./types.js";
+import { deriveDiscoveryMaterial, discoveryPayload, sealDiscoveryPayload, decryptDiscoveryPayload, DiscoveryReplayWindow, type DiscoveryMaterial } from "./discovery-crypto.js";
+import type { DiscoverySignal, VerifiedDiscoverySignal } from "./discovery-provider.js";
+import { encodeBinary } from "./binary-codec.js";
 
 export class LocalCore {
+  private readonly discoveryReplays = new DiscoveryReplayWindow();
+  private discoveryMaterial: { keyId: string; value: DiscoveryMaterial } | undefined;
   private sequence = 0;
   private lamport = 0;
   private queue: Promise<unknown> = Promise.resolve();
@@ -38,7 +43,7 @@ export class LocalCore {
     const core = new LocalCore(store, identity, project, interval);
     try {
       if (!project || project.descriptor.projectId !== store.projectId || project.identity.actorId !== identity.actorId || identity.actorId !== store.actorId) throw new AuthorizationError("Project/identity does not own this database");
-      core.projector = await BinaryProjection.create();
+      core.projector = await BinaryProjection.create(project.descriptor.policies);
       const cp = store.checkpoint ? await authenticateCheckpoint(store.checkpoint.proof, project) : undefined;
       const events = store.readRecoveryEvents ? [...await store.readRecoveryEvents()] : [...await store.readEvents()];
       core.replayedEvents = events.length;
@@ -50,14 +55,14 @@ export class LocalCore {
         if (events.some(e => !isDataType(e.type))) {
           core.history = [...await store.readEvents()];
           core.state = await project.evaluateBinary(core.history);
-          core.projector.reset(); core.projector.applyAll(core.state.blocks);
+          core.projector.reset(); core.projector.applyAuthorized(core.state.blocks, core.state.roles);
         } else {
           core.state = await project.extend(core.state, events);
-          core.projector.applyAll(core.state.blocks);
+          core.projector.applyAuthorized(core.state.blocks, core.state.roles);
         }
       } else {
         core.history = events; core.state = await project.evaluateBinary(events);
-        core.projector.applyAll(core.state.blocks);
+        core.projector.applyAuthorized(core.state.blocks, core.state.roles);
       }
       for (const block of core.state.blocks) block.fill(0);
       await core.index.assertCompatible(events);
@@ -127,12 +132,12 @@ export class LocalCore {
     let view: Snapshot;
     try {
       if (!isDataType(event.type)) this.projector.reset();
-      this.projector.applyAll(state.blocks);
+      this.projector.applyAuthorized(state.blocks, state.roles);
       view = this.projector.snapshot(Math.max(this.lamport, event.lamport));
     } catch (error) {
       // Allocation/snapshot failure may leave unpublished native state; require recovery.
       // Invalid ordinary input is staged atomically in C++ and leaves its state unchanged.
-      if (!isDataType(event.type) || !(error instanceof Error && error.name === "NativeMergeError" && (error as { status?: number }).status === 1)) this.failure = error;
+      if (!isDataType(event.type) || !(error instanceof Error && error.name === "NativeMergeError" && [1, 3].includes((error as { status?: number }).status ?? 0))) this.failure = error;
       throw error;
     } finally { for (const block of state.blocks) block.fill(0); }
     try {
@@ -166,6 +171,33 @@ export class LocalCore {
 
   snapshot(): Promise<Snapshot> { return this.operation(() => this.view); }
   getProjectInfo() { return this.operation(() => ({ descriptor: this.project.descriptor, certificate: this.project.certificate, currentKeyId: this.state.currentKeyId })); }
+  private async rendezvous(): Promise<DiscoveryMaterial> {
+    this.requireStorageMember(this.project.certificate);
+    const key = this.state.keys.get(this.state.currentKeyId);
+    if (!key) throw new AuthorizationError("No current discovery key");
+    if (this.discoveryMaterial?.keyId !== key.id) this.discoveryMaterial = { keyId: key.id, value: await deriveDiscoveryMaterial(this.project.descriptor, key) };
+    return this.discoveryMaterial.value;
+  }
+  getDiscoveryInfo(): Promise<{ topic: string; keyId: string; actorId: string }> {
+    return this.operation(async () => ({ topic: (await this.rendezvous()).topic, keyId: this.state.currentKeyId, actorId: this.actorId }));
+  }
+  sealDiscovery(signal: DiscoverySignal): Promise<Uint8Array<ArrayBuffer>> {
+    return this.operation(async () => sealDiscoveryPayload(discoveryPayload(this.project.descriptor, this.state.currentKeyId,
+      this.actorId, this.project.certificate, signal), await this.rendezvous(), this.identity!.privateKey));
+  }
+  openDiscovery(packet: Uint8Array<ArrayBuffer>): Promise<VerifiedDiscoverySignal> {
+    return this.operation(async () => {
+      const { payload, signature } = await decryptDiscoveryPayload(packet, await this.rendezvous());
+      if (payload.projectId !== this.projectId || payload.rootActorId !== this.project.descriptor.rootActorId || payload.keyId !== this.state.currentKeyId) throw new AuthorizationError("Discovery project/epoch mismatch");
+      const certificate = await verifyCertificate(payload.certificate, this.project.descriptor);
+      if (certificate.subject !== payload.actorId) throw new AuthorizationError("Discovery certificate/actor mismatch");
+      this.requireStorageMember(certificate);
+      const key = await crypto.subtle.importKey("raw", fromBase64Url(payload.actorId.slice(5), 65), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+      if (!await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, signature, encodeBinary(payload))) throw new AuthorizationError("Invalid discovery signature");
+      this.discoveryReplays.accept(payload);
+      return { actorId: payload.actorId, signal: payload.signal };
+    });
+  }
   /** Worker-internal non-extractable key handle; never exposed by LocalCoreClient RPC. */
   storageKey(keyId?: string): Promise<{ keyId: string; key: CryptoKey }> {
     return this.operation(() => {
@@ -232,8 +264,8 @@ export class LocalCore {
         await this.project.extend(this.state, events);
       try {
         for (const e of events) if (!prospective.eligible.has(e.id)) throw new AuthorizationError("Event permission revoked");
-        const validation = await BinaryProjection.create();
-        try { validation.applyAll(prospective.blocks); } finally { validation.close(); }
+        const validation = await BinaryProjection.create(this.project.descriptor.policies);
+        try { validation.applyAuthorized(prospective.blocks, prospective.roles); } finally { validation.close(); }
       }
       finally { for (const block of prospective.blocks) block.fill(0); }
       newEvents.sort((a, b) => Number(isDataType(a.type)) - Number(isDataType(b.type)) || a.lamport - b.lamport || a.sequence - b.sequence);

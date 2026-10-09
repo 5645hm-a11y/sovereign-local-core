@@ -6,7 +6,10 @@ import type { StorageProgress, UploadOptions, StorageReadOptions } from "./stora
 export type { ProjectCredentials, ProjectState } from "./react-session.js";
 
 export function useProject(projectId: string, credentials: ProjectCredentials) {
-  const session = useMemo(() => new ProjectSession(projectId, credentials), [projectId, credentials.email, credentials.password,
+  const wallet = credentials.mode === "wallet";
+  const selector = wallet ? credentials.walletId : credentials.email;
+  const secret = wallet ? credentials.passphrase : credentials.password;
+  const session = useMemo(() => new ProjectSession(projectId, credentials), [projectId, wallet, selector, secret, credentials.policies,
     credentials.vaultName, credentials.invitation, credentials.databaseName, credentials.createIfMissing, credentials.clientOptions, credentials.p2p]);
   useEffect(() => session.retain(), [session]);
   const state = useSyncExternalStore(session.subscribe, session.getState, session.getServerState);

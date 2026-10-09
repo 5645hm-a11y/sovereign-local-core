@@ -51,4 +51,7 @@ await build({ ...common, plugins: [{ name: "shared-core", setup(b) {
   b.onResolve({ filter: /^\.\/((client)|(p2p-sync))\.js$/ }, () => ({ path: "./index.js", external: true }));
 } }], external: ["react"], entryPoints: [resolve(root, "src/react.ts")], outfile: resolve(out, "react.js"), banner: { js: '"use client";' } });
 await cp(resolve(root, "dist"), resolve(out, "types"), { recursive: true, filter: source => !/\.(js|mjs|wasm|map|json)$/.test(source) && !source.includes("/wasm/") });
+await build({ bundle: true, format: "esm", platform: "browser", target: "es2022", minify: true, legalComments: "eof",
+  entryPoints: [resolve(root, "src/nostr-discovery.ts")], outfile: resolve(out, "nostr.js") });
+await cp(resolve(root, "THIRD_PARTY_NOTICES.md"), resolve(out, "THIRD_PARTY_NOTICES.md"));
 console.log(`NPM bundles written to ${out}; worker includes ${wasm.byteLength} WASM bytes.`);

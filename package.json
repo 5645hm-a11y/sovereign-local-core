@@ -1,33 +1,82 @@
 {
   "name": "sovereign-local-core",
-  "version": "0.1.0",
-  "description": "A local-first P2P database for the web: C++/WASM CRDTs, encrypted OPFS, WebRTC sync and streamed file storage.",
+  "version": "0.2.0",
+  "description": "A local-first P2P database with sovereign wallets, native write policies, deterministic invariants, encrypted OPFS and WebRTC mesh sync.",
   "license": "MIT",
   "author": "Sovereign Local Core contributors",
-  "keywords": ["local-first", "offline-first", "crdt", "p2p", "wasm", "webassembly", "database", "opfs", "webrtc", "e2ee", "event-sourcing", "react"],
-  "repository": { "type": "git", "url": "git+https://github.com/5645hm-a11y/sovereign-local-core.git" },
+  "keywords": [
+    "local-first",
+    "offline-first",
+    "crdt",
+    "p2p",
+    "wasm",
+    "webassembly",
+    "database",
+    "opfs",
+    "webrtc",
+    "e2ee",
+    "event-sourcing",
+    "react",
+    "wallet",
+    "row-level-security",
+    "invariants"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/5645hm-a11y/sovereign-local-core.git"
+  },
   "homepage": "https://github.com/5645hm-a11y/sovereign-local-core#readme",
-  "bugs": { "url": "https://github.com/5645hm-a11y/sovereign-local-core/issues" },
+  "bugs": {
+    "url": "https://github.com/5645hm-a11y/sovereign-local-core/issues"
+  },
   "type": "module",
   "main": "./package-dist/index.js",
   "module": "./package-dist/index.js",
   "types": "./package-dist/types/index.d.ts",
   "exports": {
-    ".": { "types": "./package-dist/types/index.d.ts", "import": "./package-dist/index.js" },
-    "./react": { "types": "./package-dist/types/react.d.ts", "import": "./package-dist/react.js" },
+    ".": {
+      "types": "./package-dist/types/index.d.ts",
+      "import": "./package-dist/index.js"
+    },
+    "./react": {
+      "types": "./package-dist/types/react.d.ts",
+      "import": "./package-dist/react.js"
+    },
     "./worker": "./package-dist/worker.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./nostr": {
+      "types": "./package-dist/types/nostr-discovery.d.ts",
+      "import": "./package-dist/nostr.js"
+    }
   },
-  "files": ["package-dist", "scripts/copy-assets.mjs", "README.md", "LICENSE", "docs"],
-  "bin": { "p2p-core-copy-assets": "scripts/copy-assets.mjs" },
+  "files": [
+    "package-dist",
+    "scripts/copy-assets.mjs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "bin": {
+    "p2p-core-copy-assets": "scripts/copy-assets.mjs"
+  },
   "sideEffects": false,
-  "publishConfig": { "access": "public" },
-  "peerDependencies": { "react": ">=18 <20" },
-  "peerDependenciesMeta": { "react": { "optional": true } },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "react": ">=18 <20"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts",
     "build:wasm": "node scripts/build-wasm.mjs",
-    "build:ts": "tsc -p tsconfig.json",
+    "build:ts": "tsc -p tsconfig.json && node scripts/build-discovery.mjs",
     "build:package": "npm run build:ts && node scripts/build-wasm.mjs --browser && node scripts/build-package.mjs",
     "prepack": "npm run build:package",
     "demo:react": "npm run dev --prefix examples/react-demo",
@@ -45,6 +94,7 @@
     "test:dx": "node scripts/test-dx.mjs"
   },
   "devDependencies": {
+    "@noble/secp256k1": "3.2.0",
     "@playwright/test": "^1.63.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

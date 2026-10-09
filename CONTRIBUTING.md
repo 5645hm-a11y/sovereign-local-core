@@ -52,9 +52,14 @@ they are not production credentials or public application examples.
 ## Architecture map
 
 - `native/`: C++ LWW registers, native sessions, ABI 1 and checkpoint serialization.
+- `native/core_policy.inc`, `src/policies.ts`: pinned native row policies,
+  conditional replay and versioned candidate checkpoints; see [contracts](docs/POLICIES.md).
 - `src/engine.ts`, `project.ts`: authorization, cryptography, durable publication.
 - `src/opfs.ts`, `framed-log.ts`, `checkpoints.ts`: recovery and persistence.
 - `src/p2p-sync.ts`: transport, catch-up, framing and backpressure.
+- `src/sync-session.ts`, `rtc-byte-link.ts`: shared Streams protocol and RTC adapter.
+- `src/discovery*.ts`, `nostr-discovery.ts`, `p2p-webrtc.ts`: sealed discovery,
+  optional public relays and authenticated WebRTC negotiation.
 - `src/storage*.ts`, `blob-store.ts`: encrypted out-of-band chunks and lazy streams.
 - `src/react*.ts`, `client.ts`, `worker.ts`: optional hooks and Worker lifecycle.
 - `docs/`: security contracts, ABI, storage protocol and scoped benchmarks.
@@ -69,8 +74,16 @@ tests. Documentation changes should run `npm run check:release`.
 
 Keep Worker-owned keys private. Validate incoming data before durable appends.
 Do not publish or acknowledge unflushed state. Preserve signed historical bytes
-and deterministic ordinal ordering. Never introduce an implicit cloud relay,
-public STUN service or telemetry endpoint. Describe why a dependency is necessary.
+and deterministic ordinal ordering. Document external services and make them
+replaceable. Constructing the optional Nostr adapter selects its documented public
+relays; the new WebRTC wrapper defaults to Google STUN as requested. The legacy
+transport retains explicit ICE configuration. Never introduce telemetry endpoints.
+Describe why a dependency is necessary.
+
+`npx playwright test --config playwright.network.config.mjs` runs an optional
+live test against public Nostr relays and Google STUN. It is separate from normal
+CI and does not prove geographic NAT traversal. Read [DISCOVERY.md](docs/DISCOVERY.md)
+for the current source APIs and security/network boundaries.
 
 For performance changes, preserve behavior first and report workload, environment,
 warmups and medians. Separate kernel, bridge, crypto and disk/startup measurements.
