@@ -14,7 +14,9 @@ struct OwnedItem { OwnedStamp existence; bool present = false; std::map<Text, Ow
 using State = std::map<Text, OwnedItem>;
 using ActorCache = std::unordered_map<Slice, std::shared_ptr<const Text>, SliceHash, SliceEqual>;
 struct BusinessState;
-struct Session { State items; std::shared_ptr<BusinessState> business; };
+struct QueryIndexes;
+struct Session { State items; std::shared_ptr<BusinessState> business; std::shared_ptr<QueryIndexes> query_indexes; };
+template<class ChangedRows> void update_query_indexes(Session&, const State&, const ChangedRows&);
 std::unordered_map<uint32_t, std::unique_ptr<Session>> sessions;
 uint32_t next_session = 0;
 bool heap_input(const uint8_t* p, uint32_t size) {
@@ -89,6 +91,7 @@ void apply_session(Session& session, const uint8_t* bytes, uint32_t size) {
   for (auto& [id, item] : changes) for (auto& [key, reg] : item.fields) if (reg.value.borrowed) {
     reg.value.text = owned(reg.value.pending_text); reg.value.pending_text = {}; reg.value.borrowed = false;
   }
+  update_query_indexes(session, changes, changes);
   // All parsing, allocation and register updates precede publication. Node transfer allocates nothing.
   while (!changes.empty()) { auto node = changes.extract(changes.begin()); session.items.erase(node.key()); session.items.insert(std::move(node)); }
 }

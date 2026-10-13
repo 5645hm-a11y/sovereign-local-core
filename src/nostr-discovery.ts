@@ -1,14 +1,17 @@
 import { schnorr, etc } from "@noble/secp256k1";
 import { fromBase64Url, toBase64Url } from "./crypto-codec.js";
 import { MAX_DISCOVERY_PACKET, type IDiscoveryProvider } from "./discovery-provider.js";
+import { DiscoveryRouting, normalizeDiscoveryRouting, type DiscoveryRoutingOptions } from "./discovery-routing.js";
+export type { DiscoveryRoutingOptions } from "./discovery-routing.js";
 
 export const PUBLIC_NOSTR_RELAYS = Object.freeze(["wss://nos.lol", "wss://relay.primal.net"]);
-export interface NostrDiscoveryOptions { relays?: readonly string[]; kind?: number; timeoutMs?: number; onError?: (error: Error) => void }
+export interface NostrDiscoveryOptions { relays?: readonly string[]; kind?: number; timeoutMs?: number; onError?: (error: Error) => void; routing?: DiscoveryRoutingOptions }
 interface NostrEvent { id: string; pubkey: string; created_at: number; kind: number; tags: string[][]; content: string; sig: string }
 interface Relay {
   socket: WebSocket; ready: boolean; subscription: string; deadline: ReturnType<typeof setTimeout> | null;
   retry: ReturnType<typeof setTimeout> | null; attempts: number; queued: number; queue: Promise<void>;
   acks: Map<string, { resolve: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>;
+  topics: Set<string>; sampleSubscription: string | null; sampleTopics: Set<string>;
 }
 const utf8 = new TextEncoder();
 function eventBytes(e: Omit<NostrEvent, "id" | "sig">): Uint8Array<ArrayBuffer> { return utf8.encode(JSON.stringify([0, e.pubkey, e.created_at, e.kind, e.tags, e.content])); }
@@ -16,7 +19,12 @@ async function digest(e: Omit<NostrEvent, "id" | "sig">): Promise<Uint8Array<Arr
 
 /** Optional NIP-01 adapter. All application content is already sealed by the Worker. */
 export class NostrDiscovery implements IDiscoveryProvider {
-  private readonly options: Required<Omit<NostrDiscoveryOptions, "onError">> & Pick<NostrDiscoveryOptions, "onError">;
+  private readonly options: Required<Omit<NostrDiscoveryOptions, "onError" | "routing">> & Pick<NostrDiscoveryOptions, "onError">;
+  readonly supportsRouting: boolean;
+  private readonly routingOptions: Readonly<Required<DiscoveryRoutingOptions>> | null;
+  private directory: DiscoveryRouting | null = null;
+  private sampleTopics: string[] = []; private sampleRound = 0;
+  private rotationTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly relays = new Map<string, Relay>();
   private readonly seen = new Map<string, number>();
   private key: Uint8Array | null = null; private publicKey = ""; private topic = "";
@@ -26,6 +34,8 @@ export class NostrDiscovery implements IDiscoveryProvider {
   private cancelStartup: ((error: Error) => void) | null = null;
   readonly stats = { published: 0, received: 0, rejected: 0, reconnects: 0 };
   constructor(options: NostrDiscoveryOptions = {}) {
+    this.supportsRouting = options.routing !== undefined;
+    this.routingOptions = options.routing === undefined ? null : normalizeDiscoveryRouting(options.routing);
     const relays = [...new Set(options.relays ?? PUBLIC_NOSTR_RELAYS)];
     if (!relays.length || relays.length > 8) throw new TypeError("Select 1–8 Nostr relays");
     for (const relay of relays) {
@@ -37,10 +47,24 @@ export class NostrDiscovery implements IDiscoveryProvider {
     if (!Number.isFinite(this.options.timeoutMs) || this.options.timeoutMs <= 0) throw new TypeError("Invalid discovery timeout");
   }
   async start(topic: string, receive: (packet: Uint8Array<ArrayBuffer>) => void): Promise<void> {
+    return this.open(topic, receive);
+  }
+  async startRouted(topic: string, instanceId: string, receive: (packet: Uint8Array<ArrayBuffer>) => void): Promise<void> {
+    if (!this.routingOptions) throw new Error("Routed discovery must be configured explicitly");
+    fromBase64Url(instanceId, 32);
+    return this.open(topic, receive, instanceId);
+  }
+  private async open(topic: string, receive: (packet: Uint8Array<ArrayBuffer>) => void, instanceId?: string): Promise<void> {
     fromBase64Url(topic, 32); this.stop(); this.running = true; const generation = this.generation;
-    const pair = schnorr.keygen(); this.key = pair.secretKey; this.publicKey = etc.bytesToHex(pair.publicKey);
-    this.topic = topic; this.receiver = receive;
     try {
+      if (instanceId !== undefined) {
+        const directory = await DiscoveryRouting.create(topic, instanceId, this.routingOptions!);
+        const topics = await directory.sampleTopics(0);
+        if (!this.running || generation !== this.generation) throw new Error("Discovery startup was cancelled");
+        this.directory = directory; this.sampleTopics = topics;
+      }
+      const pair = schnorr.keygen(); this.key = pair.secretKey; this.publicKey = etc.bytesToHex(pair.publicKey);
+      this.topic = topic; this.receiver = receive;
       await new Promise<void>((resolve, reject) => {
         this.cancelStartup = reject;
         this.startupTimer = setTimeout(() => reject(new Error("No Nostr relay acknowledged the subscription")), this.options.timeoutMs);
@@ -49,17 +73,20 @@ export class NostrDiscovery implements IDiscoveryProvider {
       });
     } catch (error) { if (generation === this.generation) this.stop(); throw error; }
     if (generation !== this.generation) throw new Error("Discovery startup was cancelled");
+    if (this.directory) this.scheduleRotation(generation);
   }
   private connect(url: string, generation: number, attempts: number): void {
     if (!this.running || generation !== this.generation) return;
     const socket = new WebSocket(url);
     const relay: Relay = { socket, ready: false, subscription: crypto.randomUUID(), deadline: null, retry: null, attempts,
-      queued: 0, queue: Promise.resolve(), acks: new Map() };
+      queued: 0, queue: Promise.resolve(), acks: new Map(),
+      topics: new Set(this.directory ? [this.directory.inbox, this.directory.presence] : [this.topic]), sampleSubscription: null, sampleTopics: new Set() };
     this.relays.set(url, relay);
     relay.deadline = setTimeout(() => socket.close(), this.options.timeoutMs);
     socket.onopen = () => {
       if (!this.current(url, relay, generation)) return;
-      socket.send(JSON.stringify(["REQ", relay.subscription, { kinds: [this.options.kind], "#t": [this.topic], since: Math.floor(Date.now() / 1000) - 90, limit: 0 }]));
+      this.subscribe(relay, relay.subscription, [...relay.topics]);
+      if (this.directory) this.replaceSamples(relay);
     };
     socket.onmessage = event => {
       if (!this.current(url, relay, generation)) return;
@@ -78,6 +105,30 @@ export class NostrDiscovery implements IDiscoveryProvider {
     };
   }
   private current(url: string, relay: Relay, generation: number): boolean { return this.running && generation === this.generation && this.relays.get(url) === relay; }
+  private subscribe(relay: Relay, subscription: string, topics: string[]): void {
+    relay.socket.send(JSON.stringify(["REQ", subscription, { kinds: [this.options.kind], "#t": topics, since: Math.floor(Date.now() / 1000) - 90, limit: 0 }]));
+  }
+  private replaceSamples(relay: Relay): void {
+    if (relay.sampleSubscription !== null) relay.socket.send(JSON.stringify(["CLOSE", relay.sampleSubscription]));
+    relay.sampleSubscription = crypto.randomUUID(); relay.sampleTopics = new Set(this.sampleTopics);
+    this.subscribe(relay, relay.sampleSubscription, this.sampleTopics);
+  }
+  private scheduleRotation(generation: number): void {
+    this.rotationTimer = setTimeout(() => { this.rotationTimer = null; void this.rotateSamples(generation); }, this.directory!.config.rotationIntervalMs);
+  }
+  private async rotateSamples(generation: number): Promise<void> {
+    const directory = this.directory;
+    if (!directory || !this.running || generation !== this.generation) return;
+    try {
+      const round = (this.sampleRound + 1) % (directory.config.bucketCount - 1), topics = await directory.sampleTopics(round);
+      if (!this.running || generation !== this.generation) return;
+      this.sampleRound = round; this.sampleTopics = topics;
+      for (const relay of this.relays.values()) if (relay.socket.readyState === WebSocket.OPEN) {
+        try { this.replaceSamples(relay); } catch (error) { this.report(error); relay.socket.close(); }
+      }
+    } catch (error) { this.report(error); }
+    if (this.running && generation === this.generation) this.scheduleRotation(generation);
+  }
   private async receive(relay: Relay, text: string, generation: number): Promise<void> {
     if (!this.running || generation !== this.generation || relay.socket.readyState !== WebSocket.OPEN) return;
     const message: unknown = JSON.parse(text);
@@ -90,31 +141,49 @@ export class NostrDiscovery implements IDiscoveryProvider {
       if (pending) { clearTimeout(pending.timer); relay.acks.delete(message[1]); pending.resolve(message[2] === true); }
       return;
     }
-    if (message[0] === "CLOSED" && message[1] === relay.subscription) { this.report(new Error("Relay closed discovery subscription")); relay.socket.close(); return; }
-    if (message[0] !== "EVENT" || message[1] !== relay.subscription) return;
+    if (message[0] === "CLOSED" && (message[1] === relay.subscription || (relay.sampleSubscription !== null && message[1] === relay.sampleSubscription))) { this.report(new Error("Relay closed discovery subscription")); relay.socket.close(); return; }
+    const topics = message[1] === relay.subscription ? relay.topics : relay.sampleSubscription !== null && message[1] === relay.sampleSubscription ? relay.sampleTopics : null;
+    if (message[0] !== "EVENT" || topics === null) return;
     const e = message[2] as NostrEvent;
     if (!e || !/^[0-9a-f]{64}$/.test(e.id) || !/^[0-9a-f]{64}$/.test(e.pubkey) || !/^[0-9a-f]{128}$/.test(e.sig) || e.kind !== this.options.kind ||
       !Number.isSafeInteger(e.created_at) || Math.abs(Math.floor(Date.now() / 1000) - e.created_at) > 90 ||
       !Array.isArray(e.tags) || e.tags.length > 4 || e.tags.some(tag => !Array.isArray(tag) || tag.length !== 2 || tag.some(value => typeof value !== "string" || value.length > 128)) ||
-      !e.tags.some(tag => tag[0] === "t" && tag[1] === this.topic) || typeof e.content !== "string" || e.content.length > Math.ceil(MAX_DISCOVERY_PACKET * 8 / 6)) throw new Error("Invalid Nostr event");
+      !e.tags.some(tag => tag[0] === "t" && tag[1] !== undefined && topics.has(tag[1])) || typeof e.content !== "string" || e.content.length > Math.ceil(MAX_DISCOVERY_PACKET * 8 / 6)) throw new Error("Invalid Nostr event");
     const now = Date.now(); for (const [id, expiry] of this.seen) if (expiry < now) this.seen.delete(id);
     if (this.seen.has(e.id)) return;
     const hash = await digest(e);
     if (etc.bytesToHex(hash) !== e.id || !await schnorr.verifyAsync(etc.hexToBytes(e.sig), hash, etc.hexToBytes(e.pubkey))) throw new Error("Invalid Nostr event signature");
     const packet = fromBase64Url(e.content);
-    if (packet.length > MAX_DISCOVERY_PACKET || this.seen.size >= 4096) throw new Error("Nostr receive limit exceeded");
-    if (!this.running || generation !== this.generation) return;
+    if (packet.length > MAX_DISCOVERY_PACKET) throw new Error("Nostr receive limit exceeded");
+    if (!this.running || generation !== this.generation || relay.socket.readyState !== WebSocket.OPEN ||
+        (message[1] !== relay.subscription && message[1] !== relay.sampleSubscription)) return;
+    // Separate relay queues can verify the same event concurrently.
+    if (this.seen.has(e.id)) return;
+    if (this.seen.size >= 4096) throw new Error("Nostr receive limit exceeded");
     this.seen.set(e.id, now + 120000); this.stats.received++; this.receiver?.(packet);
   }
   async publish(packet: Uint8Array<ArrayBuffer>): Promise<void> {
+    if (this.directory) throw new Error("Routed discovery requires a recipient");
+    return this.publishAt(packet, () => Promise.resolve(this.topic));
+  }
+  async publishRouted(packet: Uint8Array<ArrayBuffer>, recipient: string | null): Promise<void> {
+    const directory = this.directory;
+    if (!directory) throw new Error("Routed discovery is not started");
+    return this.publishAt(packet, () => directory.target(recipient));
+  }
+  private async publishAt(packet: Uint8Array<ArrayBuffer>, target: () => Promise<string>): Promise<void> {
     if (!this.running || !this.key || !(packet instanceof Uint8Array) || packet.length > MAX_DISCOVERY_PACKET) throw new Error("Discovery is stopped or packet is oversized");
     if (this.queuedPublishes >= 16) throw new Error("Nostr publish queue is full");
     this.queuedPublishes++; const generation = this.generation;
     try {
+      const topic = await target();
+      if (!this.running || generation !== this.generation || !this.key) throw new Error("Discovery was replaced");
       const created_at = Math.floor(Date.now() / 1000);
       const event = { pubkey: this.publicKey, created_at, kind: this.options.kind,
-        tags: [["t", this.topic], ["expiration", String(created_at + 60)]], content: toBase64Url(packet) };
-      const hash = await digest(event), id = etc.bytesToHex(hash), sig = etc.bytesToHex(await schnorr.signAsync(hash, this.key));
+        tags: [["t", topic], ["expiration", String(created_at + 60)]], content: toBase64Url(packet) };
+      const hash = await digest(event), id = etc.bytesToHex(hash);
+      if (!this.running || generation !== this.generation || !this.key) throw new Error("Discovery was replaced");
+      const sig = etc.bytesToHex(await schnorr.signAsync(hash, this.key));
       if (!this.running || generation !== this.generation) throw new Error("Discovery was replaced");
       const wire = JSON.stringify(["EVENT", { ...event, id, sig }]);
       const ready = [...this.relays.values()].filter(relay => relay.ready && relay.socket.readyState === WebSocket.OPEN);
@@ -134,6 +203,8 @@ export class NostrDiscovery implements IDiscoveryProvider {
     this.running = false; this.generation++; this.ready = null; this.receiver = null;
     if (this.startupTimer !== null) clearTimeout(this.startupTimer); this.startupTimer = null;
     this.cancelStartup?.(new Error("Discovery startup was cancelled")); this.cancelStartup = null;
+    if (this.rotationTimer !== null) clearTimeout(this.rotationTimer); this.rotationTimer = null;
+    this.directory = null; this.sampleTopics = []; this.sampleRound = 0;
     for (const relay of this.relays.values()) {
       if (relay.deadline !== null) clearTimeout(relay.deadline); if (relay.retry !== null) clearTimeout(relay.retry);
       for (const ack of relay.acks.values()) { clearTimeout(ack.timer); ack.resolve(false); }

@@ -42,6 +42,11 @@ exceptions; no C++ runtime library beyond the toolchain/standard library is adde
 | `npm run demo:react` / `npm run demo:vanilla` | Run public examples on 4182 / 4183 |
 | `npm run check:release` | Check staged release files, metadata, links and publication hygiene |
 | `npm run benchmark` / `npm run benchmark:browser` | Reproduce native/bridge/recovery measurements |
+| `npm run benchmark:invariants` | Measure business replay, exact duplicates, late conflicts and checkpoint restore |
+| `npm run benchmark:sync` | Compare bulk, sequential and indexed cursor export using real crypto and an in-memory file |
+| `npm run benchmark:discovery` | Reproduce the 10k synthetic routing fanout model (not a live swarm benchmark) |
+| `npm run benchmark:epochs` | Measure bounded Merkle epoch pages using synthetic recipients/witnesses and real Root cryptography |
+| `npm run benchmark:recovery` | Model routed recovery deliveries over 10k synthetic inboxes (not a live-swarm throughput test) |
 
 Chrome can be installed for tests with `npx playwright install --with-deps chrome`.
 Core browser fixtures use port 4174 and ephemeral signaling ports; DX fixtures use
@@ -54,10 +59,17 @@ they are not production credentials or public application examples.
 - `native/`: C++ LWW registers, native sessions, ABI 1 and checkpoint serialization.
 - `native/core_policy.inc`, `src/policies.ts`: pinned native row policies,
   conditional replay and versioned candidate checkpoints; see [contracts](docs/POLICIES.md).
+- `src/read-domains.ts`, `read-domains-client.ts`: signed general-purpose namespaces,
+  independent key/project partitions and role admission; see [read domains](docs/READ_DOMAINS.md)
+  and [scalability contracts](docs/SCALABILITY.md).
 - `src/engine.ts`, `project.ts`: authorization, cryptography, durable publication.
 - `src/opfs.ts`, `framed-log.ts`, `checkpoints.ts`: recovery and persistence.
-- `src/p2p-sync.ts`: transport, catch-up, framing and backpressure.
+- `src/p2p-sync.ts`: legacy WebSocket discovery/WebRTC adapter.
 - `src/sync-session.ts`, `rtc-byte-link.ts`: shared Streams protocol and RTC adapter.
+- `src/framed-log.ts`, `local-store.ts`, `engine.ts`: fenced page reads and
+  authenticated sync cursors; see [contracts and measurements](docs/SYNC_CURSORS.md).
+- `src/log-offset-index.ts`, `checkpoints.ts`: authenticated durable addresses,
+  bounded actor/sequence selection and old-checkpoint rebuild; see [indexed deltas](docs/SYNC_INDEX.md).
 - `src/discovery*.ts`, `nostr-discovery.ts`, `p2p-webrtc.ts`: sealed discovery,
   optional public relays and authenticated WebRTC negotiation.
 - `src/storage*.ts`, `blob-store.ts`: encrypted out-of-band chunks and lazy streams.
@@ -84,6 +96,27 @@ Describe why a dependency is necessary.
 live test against public Nostr relays and Google STUN. It is separate from normal
 CI and does not prove geographic NAT traversal. Read [DISCOVERY.md](docs/DISCOVERY.md)
 for the current source APIs and security/network boundaries.
+
+Native replay changes should run the [affected-row parity and benchmarks](docs/ROW_REPLAY.md).
+The restore oracle is part of unit tests; optional independently compiled parity
+needs a preserved pre-change WASM file. Benchmark one hot row with
+`node scripts/benchmark-invariants.mjs --rows=1 --samples=3` as well as spread rows.
+
+Field-query changes must preserve strict scalar types, UTF-16/tie ordering,
+bounded scans, atomic reference maintenance, cache fallback and malformed-input failure. Read
+[contracts/benchmarks](docs/FIELD_QUERIES.md) and run
+`node scripts/benchmark-field-queries.mjs` separately from heavy tests.
+For index changes, include [incremental maintenance](docs/INCREMENTAL_INDEXES.md)
+cases for same-key rewiring, late row replay, resurrection, and 256/257-ID fallback.
+
+React page changes must preserve one-page ownership, selective refresh,
+late-result cleanup, finite retries and SSR/Strict Mode behavior. Read
+[paged React contracts](docs/REACT_PAGED_QUERIES.md) and run installed-package tests.
+
+Query changes should preserve full-view parity and revision invalidation; see
+[query/receipt contracts](docs/QUERY_PAGES.md). After building, run
+`node scripts/benchmark-queries.mjs --samples=5` and
+`node scripts/benchmark-queries-browser.mjs` independently of test workloads.
 
 For performance changes, preserve behavior first and report workload, environment,
 warmups and medians. Separate kernel, bridge, crypto and disk/startup measurements.

@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-11T18:45:10.464Z",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "scope": "10,000 synthetic envelope records and 10,000 synthetic witness records; one genuine recipient-encrypted Root key, real Root signatures, Merkle proofs and ProjectContext verification/unwrap. Copied envelopes at synthetic IDs are not usable recipient grants; witness digests are synthetic. No 10k-member governance, OPFS flush, Worker RPC, RTC, database data replay, memory peak or WAN benchmark.",
+  "recipients": 10000,
+  "witnesses": 10000,
+  "pageEntries": 128,
+  "pageCount": 158,
+  "pageBodyLimitBytes": 98304,
+  "maximumPageBodyBytes": 79954,
+  "maximumSignedPageBytes": 81434,
+  "manifestBytes": 2406,
+  "totalSignedBytes": 9302688,
+  "hypotheticalInlineBytes": 8791904,
+  "inlineNote": "Byte-size comparison only: the hypothetical inline record exceeds both legacy array and 1 MiB log limits and is never signed/admitted as an inline event.",
+  "planMs": 1615.7302,
+  "signingMs": 2773.1555,
+  "validationMs": 3986.5759,
+  "limitations": "Paging bounds each record, not complete plan/history memory. All pages remain necessary for activation, and governance reevaluation/checkpoints remain linear. Legacy invitation keyring (128), finite history/native bounds and cold discovery after key rotation remain separate constraints."
+}

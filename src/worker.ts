@@ -30,43 +30,73 @@ scope.onmessage = (message) => {
       id: number; method: string; databaseName?: string; command?: unknown; events?: unknown[]; summary?: unknown;
       options?: IdentityOpenOptions;
       actorId?: string; role?: import("./types.js").Role;
+      revokeOptions?: import("./types.js").RevokeOptions;
       blob?: Blob; uploadOptions?: import("./storage.js").UploadOptions; fileId?: string; index?: number;
       bytes?: Uint8Array<ArrayBuffer>; chunkRequest?: import("./storage.js").ChunkRequest; manifestDigest?: string;
       signal?: import("./discovery-provider.js").DiscoverySignal; packet?: Uint8Array<ArrayBuffer>;
+      cursorId?: string;
+      queryOptions?: import("./query.js").QueryOptions;
     };
     try {
       let result: unknown;
       if (request.method === "identify") {
         if (core) throw new Error("Identity identification requires an unopened client");
         result = { actorId: (await openIdentityVault(request.options!)).actorId };
-      } else if (request.method === "open" || request.method === "createProject") {
+      } else if (["open", "createProject", "openCompact", "createProjectCompact"].includes(request.method)) {
         await wasmReady;
         if (core) throw new Error("Worker already owns a database");
         if (!request.options) throw new TypeError("Identity credentials and projectId are required");
         const projectId = normalizeProjectId(request.options.projectId);
         const identity = await openIdentityVault(request.options);
         const databaseName = request.databaseName ?? "local-core";
-        const project = await openProject(databaseName, identity, request.options, request.method === "createProject");
+        const creating = request.method === "createProject" || request.method === "createProjectCompact";
+        const compact = request.method === "openCompact" || request.method === "createProjectCompact";
+        const project = await openProject(databaseName, identity, request.options, creating);
         core = await LocalCore.open(await openOPFSStore(databaseName, identity.actorId, projectId, project), identity, project);
-        try { storage = new StorageEngine(core, await OPFSBlobStore.open(databaseName, projectId)); }
-        catch (error) { await core.close(); core = undefined; throw error; }
-        core.onCommit(notification => scope.postMessage({ kind: "commit", ...notification }));
-        result = { actorId: core.actorId, projectId: core.projectId, recovery: core.recovery, snapshot: await core.snapshot() };
+        try {
+          storage = new StorageEngine(core, await OPFSBlobStore.open(databaseName, projectId));
+          core.onCommit(notification => scope.postMessage({ kind: "commit", ...notification }));
+          const opened = { actorId: core.actorId, projectId: core.projectId, recovery: core.recovery };
+          result = compact ? opened : { ...opened, snapshot: await core.snapshot() };
+        } catch (error) {
+          // Lazy first-view failure must release the log lock and permit reopening this Worker.
+          try { await core.close(); } catch { /* Preserve the original startup error. */ }
+          core = undefined; storage = undefined; throw error;
+        }
       } else {
         if (!core) throw new Error("Open a database first");
         switch (request.method) {
           case "dispatch": result = await core.dispatch(normalizeCommand(request.command)); break;
+          case "dispatchCommitted": result = await core.dispatchCommitted(normalizeCommand(request.command)); break;
           case "snapshot": result = await core.snapshot(); break;
+          case "openQueryCursor": result = await core.openQueryCursor(request.queryOptions!); break;
+          case "readQueryCursor": result = await core.readQueryCursor(request.cursorId!); break;
+          case "closeQueryCursor": await core.closeQueryCursor(request.cursorId!); result = null; break;
           case "getProjectInfo": result = await core.getProjectInfo(); break;
+          case "getBootstrapInvitation": result = await core.getBootstrapInvitation(); break;
+          case "getMemberCertificate": result = await core.getMemberCertificate(request.actorId!); break;
           case "getDiscoveryInfo": result = await core.getDiscoveryInfo(); break;
+          case "isDiscoveryPeerAuthorized": result = await core.isDiscoveryPeerAuthorized(request.actorId!); break;
+          case "getDiscoveryRecoveryInfo": result = await core.getDiscoveryRecoveryInfo(); break;
+          case "createDiscoveryRecoveryRequest": result = await core.createDiscoveryRecoveryRequest(); break;
+          case "createRoutedDiscoveryRecoveryRequest": result = await core.createRoutedDiscoveryRecoveryRequest(); break;
+          case "handleDiscoveryRecoveryRequest": result = await core.handleDiscoveryRecoveryRequest(request.packet!); break;
+          case "handleRoutedDiscoveryRecoveryRequest": result = await core.handleRoutedDiscoveryRecoveryRequest(request.packet!); break;
+          case "acceptDiscoveryRecoveryResponse": result = await core.acceptDiscoveryRecoveryResponse(request.packet!); break;
+          case "cancelDiscoveryRecovery": await core.cancelDiscoveryRecovery(); result = null; break;
           case "sealDiscovery": result = await core.sealDiscovery(request.signal!); break;
           case "openDiscovery": result = await core.openDiscovery(request.packet!); break;
           case "inviteMember": result = await core.inviteMember(request.actorId!, request.role); break;
-          case "revokeMember": result = await core.revokeMember(request.actorId!); break;
+          case "revokeMember": result = await core.revokeMember(request.actorId!, request.revokeOptions); break;
           case "readEvents": result = await core.readEvents(); break;
           case "getSyncSummary": result = await core.getSyncSummary(); break;
           case "readMissingEvents": result = await core.readMissingEvents(request.summary as import("./types.js").SyncSummary); break;
+          case "readMissingEventsPaged": result = await core.readMissingEventsPaged(request.summary as import("./types.js").SyncSummary); break;
+          case "openSyncCursor": result = await core.openSyncCursor(request.summary as import("./types.js").SyncSummary); break;
+          case "readSyncCursor": result = await core.readSyncCursor(request.cursorId!); break;
+          case "closeSyncCursor": await core.closeSyncCursor(request.cursorId!); result = null; break;
           case "ingestEvents": result = await core.ingestEvents(request.events!); break;
+          case "ingestCommitted": result = await core.ingestCommitted(request.events!); break;
           case "uploadFile": result = await storage!.upload(request.blob!, { ...request.uploadOptions,
             signal: uploads.get(request.id)!.signal,
             onProgress: progress => scope.postMessage({ kind: "progress", id: request.id, progress }) }); break;

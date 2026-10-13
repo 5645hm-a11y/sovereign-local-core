@@ -1,6 +1,6 @@
 import React, { StrictMode, memo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ProjectProvider, useProject, useLiveQuery, useStorage } from "sovereign-local-core/react";
+import { ProjectProvider, useProject, useLiveQuery, useStorage, usePagedQuery } from "sovereign-local-core/react";
 import "./style.css";
 
 const params = new URLSearchParams(location.search);
@@ -59,11 +59,40 @@ function Project() {
     {failure && <p role="alert">{failure}</p>}
   </ProjectProvider>;
 }
+function FullViewProbe() {
+  const query = useLiveQuery(view => view.items.length);
+  return <p data-testid="full-view-count">{query.loading ? "loading" : query.data}</p>;
+}
+function PagedProject() {
+  const project = useProject("react_paged_project", credentials);
+  const [prefix, setPrefix] = useState("row_"), [full, setFull] = useState(false), [failure, setFailure] = useState(null);
+  const [filtered, setFiltered] = useState(false), [threshold, setThreshold] = useState(2);
+  const query = usePagedQuery({ kind: "items", prefix, limit: 3, maxBytes: 2048,
+    ...(filtered ? { where: [{ field: "status", op: "eq", value: "open" }, { field: "priority", op: "gte", value: threshold }], orderBy: { field: "priority", direction: "desc" } } : {}) }, { project, refreshDelayMs: 10 });
+  const act = action => { void action().catch(error => setFailure(error.message)); };
+  const seed = async () => { for (let i = 0; i < 12; i++) await project.client.dispatchCommitted({ type: "ITEM_ADDED", itemId: `row_${String(i).padStart(3, "0")}`, fields: { title: `Paged row ${i}`, status: i % 2 ? "open" : "closed", priority: i % 5 } }); };
+  return <ProjectProvider project={project}>
+    <p data-testid="project-status">{project.status === "ready" ? "Ready" : project.status}</p>
+    <p data-testid="paged-status">{query.error?.message || (query.loading ? "loading" : "ready")}</p>
+    <p data-testid="paged-index">{query.pageIndex}</p><p data-testid="paged-size">{query.page?.items.length ?? 0}</p>
+    <ul data-testid="paged-rows">{query.page?.items.map(item => <li key={item.id}>{item.fields.title}</li>)}</ul>
+    <button disabled={!project.client} onClick={() => act(seed)}>Seed paged rows</button>
+    <button disabled={!project.client} onClick={() => act(() => project.client.dispatchCommitted({ type: "ITEM_ADDED", itemId: `other_${crypto.randomUUID()}`, fields: { title: "Unrelated paged record" } }))}>Add unrelated paged record</button>
+    <button disabled={!project.client} onClick={() => act(() => project.client.dispatchCommitted({ type: "ITEM_UPDATED", itemId: "row_000", fields: { title: "Changed first row" } }))}>Edit first paged row</button>
+    <button disabled={!query.canNext || query.loading} onClick={query.next}>Next page</button>
+    <button onClick={query.refresh}>Refresh paged query</button>
+    <button onClick={() => setPrefix(old => old === "row_" ? "other_" : "row_")}>Switch paged prefix</button>
+    <button onClick={() => setFull(old => !old)}>Toggle full view</button>
+    <button onClick={() => setFiltered(old => !old)}>Toggle field query</button>
+    <button onClick={() => setThreshold(old => old === 2 ? 4 : 2)}>Change field threshold</button>
+    {full && <FullViewProbe/>}{failure && <p role="alert">{failure}</p>}
+  </ProjectProvider>;
+}
 function App() {
   const [mounted, setMounted] = useState(true);
   return <main><h1>Local-first React</h1><p>Tasks and encrypted file chunks persist in this browser. This example uses fixed demo credentials; supply real user credentials in your application.</p>
     <button onClick={() => setMounted(!mounted)}>{mounted ? "Close project" : "Reopen project"}</button>
-    {mounted && <Project/>}
+    {mounted && (params.has("paged") ? <PagedProject/> : <Project/>)}
   </main>;
 }
 // Installed optional-entry probe, also exercised in the production /demo/ bundle.

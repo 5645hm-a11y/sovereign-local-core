@@ -167,7 +167,7 @@ export async function verifySignature(value: unknown): Promise<boolean> {
     const { signature, ...event } = normalizeEvent(value);
     const key = await verificationKey(event.actorId), bytes = fromBase64Url(signature, 64);
     return await crypto.subtle.verify(signatureAlgorithm, key, bytes, canonicalEventBytes(event)) ||
-      await crypto.subtle.verify(signatureAlgorithm, key, bytes, encoder.encode(legacyEventText(event)));
+      (event.schemaVersion === 3 && await crypto.subtle.verify(signatureAlgorithm, key, bytes, encoder.encode(legacyEventText(event))));
   } catch { return false; }
 }
 

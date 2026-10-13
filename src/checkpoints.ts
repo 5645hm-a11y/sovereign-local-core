@@ -10,9 +10,11 @@ export interface CoreCheckpoint {
   controls: IEvent[]; certificates: Certificate[];
   native: Uint8Array<ArrayBuffer>;
   prefixHash: Uint8Array<ArrayBuffer>;
+  /** Optional derived addresses, covered by the same owner signature and prefix hash. */
+  logLocations?: Uint8Array<ArrayBuffer>;
   readonly proof?: Uint8Array<ArrayBuffer>;
 }
-export type CheckpointData = Omit<CoreCheckpoint, "version" | "generation" | "offset" | "prefixHash" | "proof">;
+export type CheckpointData = Omit<CoreCheckpoint, "version" | "generation" | "offset" | "prefixHash" | "proof" | "logLocations">;
 const CHUNK = 1024 * 1024, LIMIT = 128 * 1024 * 1024;
 function read(file: SyncFile, at: number, size: number): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(size); let n = 0;
@@ -76,8 +78,8 @@ export class CheckpointJournal {
     this.generation = chosen.checkpoint.generation; this.latestSlot = chosen.slot;
     return chosen.checkpoint;
   }
-  async save(log: SyncFile, offset: number, data: CheckpointData): Promise<void> {
-    const cp: CoreCheckpoint = { ...data, version: 1, generation: this.generation + 1, offset, prefixHash: await this.prefix(log, offset) };
+  async save(log: SyncFile, offset: number, data: CheckpointData, logLocations?: Uint8Array<ArrayBuffer>): Promise<void> {
+    const cp: CoreCheckpoint = { ...data, ...(logLocations ? { logLocations } : {}), version: 1, generation: this.generation + 1, offset, prefixHash: await this.prefix(log, offset) };
     const plaintext = encodeWire(cp), iv = crypto.getRandomValues(new Uint8Array(12));
     try {
       const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: this.aad() }, await this.project.checkpointKey(), plaintext));

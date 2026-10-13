@@ -1,4 +1,5 @@
-import { BinaryReader } from "./binary-codec.js";
+import { BinaryReader, BinaryWriter } from "./binary-codec.js";
+import { normalizeQueryOptions, EMPTY_QUERY_POSITION, QueryPageTooLargeError, QueryIndexLimitError, type QueryOptions, type QueryPosition } from "./query.js";
 import { commandDictionaries } from "./binary-command.js";
 import type { EventDecision, FieldValue, ReducerPolicies, Role, Snapshot } from "./types.js";
 import { encodePolicies, roleCode } from "./policies.js";
@@ -24,6 +25,8 @@ interface Runtime {
   _core_session_checkpoint(handle: number): number;
   _core_session_restore(handle: number, pointer: number, bytes: number): number;
   _core_session_reset(handle: number): number;
+  _core_session_business_work?(handle: number, metric: number): number;
+  _core_session_query?(handle: number, pointer: number, bytes: number): number;
 }
 let runtimePromise: Promise<Runtime> | undefined;
 const diagnostics = { backend: "wasm" as const, abi: ABI, mergeCalls: 0, projectedEvents: 0, maxInputBytes: 0, memoryBytes: 0 };
@@ -247,6 +250,13 @@ export class WasmProjection {
 }
 /** Persistent native registers: binary deltas are copied once into a reusable WASM arena. */
 export class BinaryProjection {
+  /** Logical reducer work only; excludes parsing, vector copies, query output and crypto/I/O. */
+  get replayWork(): Readonly<{ rows: number; commands: number; suffixRows: number; replayedRows: number }> | null {
+    if (this.closed) throw new Error("Native projection is closed");
+    const read = this.runtime._core_session_business_work;
+    if (!this.policyEnabled || !read) return null;
+    return Object.freeze({ rows: read(this.handle, 0), commands: read(this.handle, 1), suffixRows: read(this.handle, 2), replayedRows: read(this.handle, 3) });
+  }
   private pointer = 0; private capacity = 0; private closed = false;
   private constructor(private readonly runtime: Runtime, private readonly handle: number, private readonly policyEnabled: boolean) {}
   static async create(policies?: ReducerPolicies): Promise<BinaryProjection> {
@@ -331,6 +341,74 @@ export class BinaryProjection {
     finally { this.runtime._core_clear_output(); }
   }
   restore(bytes: Uint8Array): void { this.input(bytes, (p, n) => this.runtime._core_session_restore(this.handle, p, n)); }
+  /** Keyset output is capped in C++, before fields/decisions are copied or decoded. */
+  queryPage(value: QueryOptions, position: QueryPosition = EMPTY_QUERY_POSITION) {
+    const options = normalizeQueryOptions(value), query = this.runtime._core_session_query;
+    if (!query) throw new Error("Query ABI missing; rebuild and deploy the matching WASM/Worker");
+    const mode = options.kind === "items" ? 1 : 2, w = new BinaryWriter();
+    const version = options.where.length || options.orderBy || options.index === "scan" ? 2 : 1;
+    const writeScalar = (value: FieldValue | undefined) => {
+      if (value === undefined) w.u32(5); else if (value === null) w.u32(0); else if (typeof value === "boolean") w.u32(value ? 2 : 1);
+      else if (typeof value === "number") { w.u32(3); w.f64(value); } else { w.u32(4); w.string(value); }
+    };
+    w.u32(0x31525153); w.u32(version); w.u32(mode); w.u32(options.limit); w.u32(options.maxBytes);
+    w.string(options.prefix); w.string(position.item); w.u64(position.lamport); w.u64(position.sequence); w.string(position.actor);
+    if (version === 2) {
+      w.u32(options.where.length); w.u32(options.index === "scan" ? 1 : 0);
+      for (const filter of options.where) { w.string(filter.field); w.u32(["eq", "gt", "gte", "lt", "lte"].indexOf(filter.op) + 1); writeScalar(filter.value); }
+      w.string(options.orderBy?.field ?? ""); w.u32(options.orderBy?.direction === "desc" ? 1 : 0);
+      const has = position.indexMissing === true || position.indexValue !== undefined;
+      w.u32(has ? 1 : 0); if (has) writeScalar(position.indexMissing ? undefined : position.indexValue);
+    }
+    const bytes = w.finish(); this.reserve(bytes.length); this.runtime.HEAPU8.set(bytes, this.pointer);
+    try {
+      const status = query(this.handle, this.pointer, bytes.length);
+      if (status === 4) throw new QueryPageTooLargeError(); if (status === 5) throw new QueryIndexLimitError(); this.status(status);
+      const outputBytes = this.runtime._core_output_size();
+      const r = new BinaryReader(new Uint8Array(this.runtime.HEAPU8.buffer, this.runtime._core_output_ptr(), outputBytes));
+      if (r.u32() !== 0x31505153 || r.u32() !== version || r.u32() !== mode) throw new Error("Invalid native query page");
+      const count = r.u32(); if (r.u32() !== outputBytes || count > options.limit || outputBytes > options.maxBytes) throw new Error("Invalid query page bounds");
+      const done = r.u32(), scanned = r.u32(); if (done > 1 || scanned > 256 || scanned < count) throw new Error("Invalid query scan bounds");
+      const indexBuildScanned = version === 2 ? r.u32() : 0, indexKeyBytes = version === 2 ? r.u32() : 0;
+      if (indexBuildScanned > 100000 || indexKeyBytes > 16 * 1024 * 1024) throw new Error("Invalid query index bounds");
+      const items: Snapshot["items"][number][] = [], decisions: EventDecision[] = [];
+      for (let i = 0; i < count; i++) {
+        if (mode === 1) {
+          const id = r.string(), n = r.u32(), fields: Record<string, FieldValue> = {};
+          for (let f = 0; f < n; f++) {
+            const key = r.string(), tag = r.u32();
+            if (["__proto__", "constructor", "prototype"].includes(key) || Object.hasOwn(fields, key)) throw new Error("Unsafe native key");
+            if (tag === 0) fields[key] = null; else if (tag === 1 || tag === 2) fields[key] = tag === 2;
+            else if (tag === 3) fields[key] = r.f64(); else if (tag === 4) fields[key] = r.string(); else throw new Error("Invalid native value");
+          }
+          items.push(Object.freeze({ id, fields: Object.freeze(fields) }));
+        } else {
+          const eventId = r.string(), itemId = r.string(), type = r.u32(), status = r.u32();
+          const command = ["ITEM_ADDED", "ITEM_UPDATED", "ITEM_DELETED", "CHECKOUT", "RETURN"][type - 1] as EventDecision["type"] | undefined;
+          const outcome = ["ACCEPTED", "REJECTED_CONFLICT", "REJECTED_POLICY"][status - 1] as EventDecision["status"] | undefined;
+          if (!command || !outcome) throw new Error("Invalid native decision");
+          decisions.push(Object.freeze({ eventId, itemId, type: command, status: outcome }));
+        }
+      }
+      const point: QueryPosition = { item: r.string(), lamport: r.u64(), sequence: r.u64(), actor: r.string() };
+      let indexed: Pick<QueryPosition, "indexValue" | "indexMissing"> = {};
+      if (version === 2) {
+        const has = r.u32(); if (has > 1) throw new Error("Invalid query continuation");
+        if (has) {
+          const tag = r.u32();
+          if (tag === 5) indexed = { indexMissing: true };
+          else if (tag === 0) indexed = { indexValue: null };
+          else if (tag === 1 || tag === 2) indexed = { indexValue: tag === 2 };
+          else if (tag === 3) indexed = { indexValue: r.f64() };
+          else if (tag === 4) indexed = { indexValue: r.string() };
+          else throw new Error("Invalid query continuation scalar");
+        }
+      }
+      const next = Object.freeze({ ...point, ...indexed }); r.done();
+      return Object.freeze({ items: Object.freeze(items), decisions: Object.freeze(decisions), done: done === 1, scanned, encodedBytes: outputBytes, next,
+        ...(version === 2 ? { indexBuildScanned, indexKeyBytes } : {}) });
+    } finally { this.runtime.HEAPU8.fill(0, this.pointer, this.pointer + bytes.length); this.runtime._core_clear_output(); }
+  }
   snapshot(lamport: number): Snapshot {
     if (this.closed || !Number.isSafeInteger(lamport) || lamport < 0) throw new Error("Invalid native snapshot request");
     this.status(this.runtime._core_session_snapshot(this.handle));

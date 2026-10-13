@@ -35,9 +35,17 @@ export interface StorageProgress {
   readonly cachedChunks: number;
 }
 export interface StorageReadOptions { readonly signal?: AbortSignal; readonly onProgress?: (progress: StorageProgress) => void }
-export interface UploadOptions extends StorageReadOptions { readonly name?: string; readonly mime?: string; readonly chunkSize?: number }
+export interface UploadOptions extends StorageReadOptions {
+  readonly name?: string; readonly mime?: string; readonly chunkSize?: number;
+  /** Optional immutable namespace, e.g. file_private_; default remains file_. */
+  readonly filePrefix?: string;
+}
+export function filePrefix(value: unknown): string {
+  if (typeof value !== "string" || !/^file_(?:[A-Za-z0-9_-]{1,48}_)?$/.test(value)) throw new TypeError("Invalid file prefix");
+  return value;
+}
 export function fileId(value: unknown): string {
-  if (typeof value !== "string" || !/^file_[a-f0-9-]{36}$/.test(value)) throw new TypeError("Invalid file ID");
+  if (typeof value !== "string" || !/^file_(?:[A-Za-z0-9_-]{1,48}_)?[a-f0-9-]{36}$/.test(value)) throw new TypeError("Invalid file ID");
   return value;
 }
 export function chunkHash(value: unknown): string { fromBase64Url(value, 32); return value as string; }

@@ -47,6 +47,41 @@ async function connected(f, overrides = {}) {
   return { channels, transports, stop: () => transports.forEach(sync => sync.stop()) };
 }
 
+test("stream session quiescence excludes pending durable imports, ACKs and chunk serving/pulls", async () => {
+  const f = await fixture(); let releaseImport, releaseChunk, holdImport = false, importStarted = false, serving = false;
+  const importGate = new Promise(resolve => { releaseImport = resolve; });
+  const chunkGate = new Promise(resolve => { releaseChunk = resolve; });
+  const sa = new SyncSession(f.adapters[0], { storage: { async serveChunk(request) {
+    serving = true; await chunkGate; return f.services[0].serveChunk(request);
+  } } });
+  const sb = new SyncSession({ ...f.adapters[1], async ingestEvents(events) {
+    if (holdImport) { importStarted = true; await importGate; }
+    return f.b.ingestEvents(events);
+  } });
+  const ab = new TransformStream(), ba = new TransformStream();
+  try {
+    sa.connect({ readable: ba.readable, writable: ab.writable, close() {} });
+    sb.connect({ readable: ab.readable, writable: ba.writable, close() {} });
+    await until(() => sa.state === "online" && sb.state === "online" && sa.idleForMs > 0 && sb.idleForMs > 0);
+    holdImport = true;
+    await f.a.dispatch({ type: "ITEM_ADDED", itemId: "pending-import", fields: { text: "must flush before ACK" } });
+    await until(() => importStarted);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(sa.idleForMs, 0); assert.equal(sb.idleForMs, 0);
+    releaseImport(); holdImport = false;
+    await until(() => sa.idleForMs > 0 && sb.idleForMs > 0);
+    const { manifest } = await f.services[0].upload(new Blob([new Uint8Array(65536).fill(7)]), { chunkSize: 65536 });
+    await until(async () => (await f.b.snapshot()).items.some(i => i.id === manifest.fileId));
+    const request = await f.services[1].createRequest(manifest.fileId, 0);
+    const pull = sb.requestChunk(request);
+    await until(() => serving);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(sa.idleForMs, 0); assert.equal(sb.idleForMs, 0);
+    releaseChunk(); assert.equal(await hashChunk(await pull), manifest.chunks[0]);
+    await until(() => sa.idleForMs > 0 && sb.idleForMs > 0);
+  } finally { releaseImport(); releaseChunk(); sa.stop(); sb.stop(); await f.close(); }
+});
+
 test("chunk progress counts durable preparation, received chunks and verified cache hits", async () => {
   const f = await fixture(), link = await connected(f);
   try {

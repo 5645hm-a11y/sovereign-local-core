@@ -1,0 +1,277 @@
+{
+  "date": "2026-10-12T08:02:03.780Z",
+  "runtime": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "wasmSha256": "2d9d36b4847ece763fe0a857ce0e9c96b0784e810458784157853470cd4dd0ea",
+  "repetitions": 5,
+  "warmups": 1,
+  "scope": "Node native LWW projection + binary query bridge + decoded JS results. No crypto, OPFS, RPC, network, module startup or checkpoint/restore time is included in query timers. Restore resets caches between cold samples. Rare equality returns the same COMPLETE result as a full bounded scan; typed descending numeric range returns 100 rows. Edit timing includes index teardown, not just reduction. First query after an edit rebuilds; this is not incremental index maintenance.",
+  "results": [
+    {
+      "rows": 1000,
+      "matches": 1,
+      "producerMs": 6.4754000000000005,
+      "samples": [
+        {
+          "coldMs": 1.1152000000000015,
+          "warmMs": 0.04179999999999495,
+          "scanDrainMs": 0.39910000000000423,
+          "rangeColdMs": 0.24750000000000227,
+          "rangeWarmMs": 0.1670000000000016,
+          "editAndInvalidationMs": 0.06430000000000291,
+          "rebuildAfterEditMs": 0.2131000000000114,
+          "scanPages": 4,
+          "scanned": 1000,
+          "indexedScanned": 1,
+          "indexKeyBytes": 55996
+        },
+        {
+          "coldMs": 0.21949999999999648,
+          "warmMs": 0.01829999999999643,
+          "scanDrainMs": 0.14610000000000412,
+          "rangeColdMs": 0.5866000000000042,
+          "rangeWarmMs": 0.17180000000000462,
+          "editAndInvalidationMs": 0.06349999999999056,
+          "rebuildAfterEditMs": 0.2528999999999968,
+          "scanPages": 4,
+          "scanned": 1000,
+          "indexedScanned": 1,
+          "indexKeyBytes": 55996
+        },
+        {
+          "coldMs": 0.3224000000000018,
+          "warmMs": 0.0367999999999995,
+          "scanDrainMs": 0.18299999999999272,
+          "rangeColdMs": 0.2767000000000053,
+          "rangeWarmMs": 0.17040000000000077,
+          "editAndInvalidationMs": 0.07880000000000109,
+          "rebuildAfterEditMs": 0.2044999999999959,
+          "scanPages": 4,
+          "scanned": 1000,
+          "indexedScanned": 1,
+          "indexKeyBytes": 55996
+        },
+        {
+          "coldMs": 0.23919999999999675,
+          "warmMs": 0.019499999999993634,
+          "scanDrainMs": 0.14329999999999643,
+          "rangeColdMs": 0.23169999999998936,
+          "rangeWarmMs": 0.16219999999999857,
+          "editAndInvalidationMs": 0.11060000000000514,
+          "rebuildAfterEditMs": 0.21880000000000166,
+          "scanPages": 4,
+          "scanned": 1000,
+          "indexedScanned": 1,
+          "indexKeyBytes": 55996
+        },
+        {
+          "coldMs": 0.21240000000000236,
+          "warmMs": 0.017100000000013438,
+          "scanDrainMs": 0.14570000000000505,
+          "rangeColdMs": 0.17680000000000007,
+          "rangeWarmMs": 0.12689999999999202,
+          "editAndInvalidationMs": 0.05530000000000257,
+          "rebuildAfterEditMs": 0.2372000000000014,
+          "scanPages": 4,
+          "scanned": 1000,
+          "indexedScanned": 1,
+          "indexKeyBytes": 55996
+        }
+      ],
+      "medians": {
+        "coldMs": 0.23919999999999675,
+        "warmMs": 0.019499999999993634,
+        "scanDrainMs": 0.14610000000000412,
+        "rangeColdMs": 0.24750000000000227,
+        "rangeWarmMs": 0.1670000000000016,
+        "editAndInvalidationMs": 0.06430000000000291,
+        "rebuildAfterEditMs": 0.21880000000000166,
+        "scanPages": 4,
+        "scanned": 1000,
+        "indexedScanned": 1,
+        "indexKeyBytes": 55996
+      },
+      "linearCapacityBytes": 8388608
+    },
+    {
+      "rows": 10000,
+      "matches": 10,
+      "producerMs": 34.5269,
+      "samples": [
+        {
+          "coldMs": 1.7280000000000086,
+          "warmMs": 0.03540000000000987,
+          "scanDrainMs": 1.2443000000000097,
+          "rangeColdMs": 0.3838000000000079,
+          "rangeWarmMs": 0.16830000000001633,
+          "editAndInvalidationMs": 0.052900000000022374,
+          "rebuildAfterEditMs": 0.8593000000000188,
+          "scanPages": 40,
+          "scanned": 10000,
+          "indexedScanned": 10,
+          "indexKeyBytes": 559960
+        },
+        {
+          "coldMs": 1.7105999999999995,
+          "warmMs": 0.044399999999996,
+          "scanDrainMs": 1.390500000000003,
+          "rangeColdMs": 0.5345000000000084,
+          "rangeWarmMs": 0.14860000000001605,
+          "editAndInvalidationMs": 0.02909999999999968,
+          "rebuildAfterEditMs": 0.9021000000000186,
+          "scanPages": 40,
+          "scanned": 10000,
+          "indexedScanned": 10,
+          "indexKeyBytes": 559960
+        },
+        {
+          "coldMs": 1.2981000000000051,
+          "warmMs": 0.03840000000002419,
+          "scanDrainMs": 1.1082999999999856,
+          "rangeColdMs": 0.3733000000000004,
+          "rangeWarmMs": 0.16460000000000719,
+          "editAndInvalidationMs": 0.02430000000001087,
+          "rebuildAfterEditMs": 0.9535999999999945,
+          "scanPages": 40,
+          "scanned": 10000,
+          "indexedScanned": 10,
+          "indexKeyBytes": 559960
+        },
+        {
+          "coldMs": 1.97229999999999,
+          "warmMs": 0.04959999999999809,
+          "scanDrainMs": 2.1805999999999983,
+          "rangeColdMs": 2.849099999999993,
+          "rangeWarmMs": 0.21700000000001296,
+          "editAndInvalidationMs": 0.07370000000000232,
+          "rebuildAfterEditMs": 2.573799999999977,
+          "scanPages": 40,
+          "scanned": 10000,
+          "indexedScanned": 10,
+          "indexKeyBytes": 559960
+        },
+        {
+          "coldMs": 2.3793000000000006,
+          "warmMs": 0.04379999999997608,
+          "scanDrainMs": 1.6159999999999854,
+          "rangeColdMs": 0.8548999999999864,
+          "rangeWarmMs": 0.12029999999998608,
+          "editAndInvalidationMs": 0.033599999999978536,
+          "rebuildAfterEditMs": 2.3840000000000146,
+          "scanPages": 40,
+          "scanned": 10000,
+          "indexedScanned": 10,
+          "indexKeyBytes": 559960
+        }
+      ],
+      "medians": {
+        "coldMs": 1.7280000000000086,
+        "warmMs": 0.04379999999997608,
+        "scanDrainMs": 1.390500000000003,
+        "rangeColdMs": 0.5345000000000084,
+        "rangeWarmMs": 0.16460000000000719,
+        "editAndInvalidationMs": 0.033599999999978536,
+        "rebuildAfterEditMs": 0.9535999999999945,
+        "scanPages": 40,
+        "scanned": 10000,
+        "indexedScanned": 10,
+        "indexKeyBytes": 559960
+      },
+      "linearCapacityBytes": 17498112
+    },
+    {
+      "rows": 100000,
+      "matches": 100,
+      "producerMs": 309.4206,
+      "samples": [
+        {
+          "coldMs": 22.392900000000054,
+          "warmMs": 0.12259999999992033,
+          "scanDrainMs": 18.201700000000073,
+          "rangeColdMs": 7.351900000000114,
+          "rangeWarmMs": 0.12789999999995416,
+          "editAndInvalidationMs": 0.037900000000036016,
+          "rebuildAfterEditMs": 23.951699999999846,
+          "scanPages": 391,
+          "scanned": 100000,
+          "indexedScanned": 100,
+          "indexKeyBytes": 5599600
+        },
+        {
+          "coldMs": 24.40210000000002,
+          "warmMs": 0.12770000000000437,
+          "scanDrainMs": 17.15319999999997,
+          "rangeColdMs": 7.29930000000013,
+          "rangeWarmMs": 0.18299999999999272,
+          "editAndInvalidationMs": 0.05290000000013606,
+          "rebuildAfterEditMs": 26.206100000000106,
+          "scanPages": 391,
+          "scanned": 100000,
+          "indexedScanned": 100,
+          "indexKeyBytes": 5599600
+        },
+        {
+          "coldMs": 23.120300000000043,
+          "warmMs": 0.12879999999995562,
+          "scanDrainMs": 17.027399999999943,
+          "rangeColdMs": 7.396099999999933,
+          "rangeWarmMs": 0.12259999999992033,
+          "editAndInvalidationMs": 0.036300000000210275,
+          "rebuildAfterEditMs": 23.809099999999944,
+          "scanPages": 391,
+          "scanned": 100000,
+          "indexedScanned": 100,
+          "indexKeyBytes": 5599600
+        },
+        {
+          "coldMs": 23.010800000000017,
+          "warmMs": 0.12770000000000437,
+          "scanDrainMs": 17.064800000000105,
+          "rangeColdMs": 7.30560000000014,
+          "rangeWarmMs": 0.1228000000000975,
+          "editAndInvalidationMs": 0.038000000000010914,
+          "rebuildAfterEditMs": 23.764799999999923,
+          "scanPages": 391,
+          "scanned": 100000,
+          "indexedScanned": 100,
+          "indexKeyBytes": 5599600
+        },
+        {
+          "coldMs": 43.13879999999972,
+          "warmMs": 0.1554999999998472,
+          "scanDrainMs": 18.257700000000114,
+          "rangeColdMs": 7.667500000000018,
+          "rangeWarmMs": 0.1317999999996573,
+          "editAndInvalidationMs": 0.03969999999981155,
+          "rebuildAfterEditMs": 24.45620000000008,
+          "scanPages": 391,
+          "scanned": 100000,
+          "indexedScanned": 100,
+          "indexKeyBytes": 5599600
+        }
+      ],
+      "medians": {
+        "coldMs": 23.120300000000043,
+        "warmMs": 0.12770000000000437,
+        "scanDrainMs": 17.15319999999997,
+        "rangeColdMs": 7.351900000000114,
+        "rangeWarmMs": 0.12789999999995416,
+        "editAndInvalidationMs": 0.038000000000010914,
+        "rebuildAfterEditMs": 23.951699999999846,
+        "scanPages": 391,
+        "scanned": 100000,
+        "indexedScanned": 100,
+        "indexKeyBytes": 5599600
+      },
+      "linearCapacityBytes": 193200128
+    }
+  ]
+}

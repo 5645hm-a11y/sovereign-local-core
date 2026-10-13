@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-09T09:07:51.648Z",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "count": 2000,
+  "fields": {
+    "textCodeUnits": 128,
+    "revision": "sequence"
+  },
+  "logBytes": 4769716,
+  "samples": 3,
+  "scope": "Real signed/encrypted source-side catch-up, WASM-validated at setup. In-memory SyncFile; excludes real OPFS, receiver, RTC, disk flush and startup. Not a browser throughput or peak-RAM benchmark.",
+  "bounds": {
+    "recordsPerPage": 64,
+    "targetRawBytes": 131072,
+    "maximumSingleRecordBytes": 1048576
+  },
+  "results": [
+    {
+      "scenario": "full",
+      "knownSequence": 0,
+      "expectedEvents": 2000,
+      "medians": {
+        "bulk": {
+          "firstBatchMs": 1891.8338000000003,
+          "totalMs": 1893.0475000000006,
+          "firstBatchReadBytes": 4769716,
+          "totalReadBytes": 4769716,
+          "pages": 0,
+          "maxEvents": 2000,
+          "maxRawBytes": 0,
+          "eventCount": 2000
+        },
+        "cursor": {
+          "firstBatchMs": 49.747699999999895,
+          "totalMs": 1839.0133999999998,
+          "firstBatchReadBytes": 131000,
+          "totalReadBytes": 4770292,
+          "pages": 38,
+          "maxEvents": 55,
+          "maxRawBytes": 131010,
+          "eventCount": 2000
+        }
+      },
+      "measurements": {
+        "bulk": [
+          {
+            "firstBatchMs": 2082.0696000000007,
+            "totalMs": 2084.3462,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 1891.8338000000003,
+            "totalMs": 1893.0475000000006,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 1779.9120000000003,
+            "totalMs": 1780.9789000000019,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          }
+        ],
+        "cursor": [
+          {
+            "firstBatchMs": 49.294700000000375,
+            "totalMs": 1945.9943000000003,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 56.207800000000134,
+            "totalMs": 1839.0133999999998,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 49.747699999999895,
+            "totalMs": 1799.7704999999987,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "tail20",
+      "knownSequence": 1980,
+      "expectedEvents": 20,
+      "medians": {
+        "bulk": {
+          "firstBatchMs": 1762.3421999999991,
+          "totalMs": 1762.3665,
+          "firstBatchReadBytes": 4769716,
+          "totalReadBytes": 4769716,
+          "pages": 0,
+          "maxEvents": 20,
+          "maxRawBytes": 0,
+          "eventCount": 20
+        },
+        "cursor": {
+          "firstBatchMs": 1915.2263999999996,
+          "totalMs": 1915.2488999999987,
+          "firstBatchReadBytes": 4770292,
+          "totalReadBytes": 4770292,
+          "pages": 38,
+          "maxEvents": 20,
+          "maxRawBytes": 131010,
+          "eventCount": 20
+        }
+      },
+      "measurements": {
+        "bulk": [
+          {
+            "firstBatchMs": 1762.3421999999991,
+            "totalMs": 1762.3665,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1752.242900000001,
+            "totalMs": 1752.2572,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1886.0920000000042,
+            "totalMs": 1886.1070000000036,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          }
+        ],
+        "cursor": [
+          {
+            "firstBatchMs": 1825.5521999999983,
+            "totalMs": 1825.5730000000003,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1915.2263999999996,
+            "totalMs": 1915.2488999999987,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1941.5477000000028,
+            "totalMs": 1941.5731000000014,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          }
+        ]
+      }
+    }
+  ]
+}

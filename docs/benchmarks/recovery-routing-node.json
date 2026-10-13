@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-12T05:37:11.723Z",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "scope": "Delivery-count model using production bucket/sample/inbox derivation for 10,000 synthetic IDs. One probe per ID in one sample round; assumes every non-self probe delivery receives a small offer, exactly one selected responder per requester and 64 fragment request/response pairs. Does not exercise 10k wallets, membership, live relays, ECDH, signatures, worker/OPFS, nonce budgets, transfer time, memory or WAN. Offer availability and successful selection are assumptions, not demonstrated liveness.",
+  "count": 10000,
+  "bucketCount": 1024,
+  "sampleBuckets": 3,
+  "fragmentPairs": 64,
+  "derivationMs": 912.1187,
+  "probePublications": 10000,
+  "probeDeliveries": 400769,
+  "offerPackets": 390769,
+  "offerDeliveries": 390769,
+  "addressedFragmentPackets": 1280000,
+  "addressedFragmentDeliveries": 1280000,
+  "routedDeliveries": 2071538,
+  "hypotheticalBroadcastDeliveries": 12900000000,
+  "deliveryReductionPercent": 99.98394156589147,
+  "probeDeliveriesPerReceiver": {
+    "mean": 40.0769,
+    "p50": 40,
+    "p95": 50,
+    "maximum": 68
+  },
+  "subscriptionsPerRelay": 2,
+  "concurrentProbeBuckets": 4,
+  "speculativeServingCursorsPerProbe": 0,
+  "limitations": "Fixed bucket counts still give quadratic aggregate probe growth. Multiple offers, hostile placement, blind spots, mismatched layouts, slow sampling and stale/malicious first offers affect liveness. Payload sizes and relay billing are not measured. Inbox delivery assumes filter-honoring relays, unique random instance IDs and one selected responder."
+}

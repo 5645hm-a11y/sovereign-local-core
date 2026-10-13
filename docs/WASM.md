@@ -187,6 +187,16 @@ Each begins `u32 magic, u32 version=1, u32 count, u32 totalBytes`.
   Each field is key string, stamp, tag/value. This is a replay checkpoint, not a query view.
 - The old stateless `core_merge` still emits indexed `SCO1` for differential/bulk benchmarks.
 
+Policy sessions in v0.3.0 use [affected-row/suffix replay](ROW_REPLAY.md).
+The optional read-only export `core_session_business_work(handle, metric)` reports
+rows/commands/suffixRows/replayedRows for metrics 0/1/2/3; it does not invalidate
+output leases. `BinaryProjection.replayWork` returns `null` when unsupported.
+It is a reduction-work diagnostic, not an end-to-end timing or bytes counter.
+
+The additional optional `core_session_query(handle, pointer, byteLength)` emits
+bounded native item/decision keyset pages, with explicit oversized-record failure.
+It does not change full Snapshot/checkpoint bytes. See [SQR1/SQP1 layout and limits](QUERY_PAGES.md).
+
 New C exports supplement ABI 1:
 `core_session_create/destroy/apply/snapshot/checkpoint/restore/reset`.
 Apply/restore take `handle, pointer, byteLength`; query/checkpoint take a handle.

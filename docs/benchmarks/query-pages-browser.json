@@ -1,0 +1,577 @@
+{
+  "date": "2026-10-12T06:54:22.937Z",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "wasmSha256": "46e3953841ee84f8cb9c61fb81ad70e505986bb6539d5f3d38eaf3a548c04f01",
+  "scope": "Real headless Chrome LocalCoreClient/Dedicated Worker/OPFS. Dispatch timings include Web Crypto, authorization, native apply, log flush, commit notification and RPC; legacy dispatch also returns a full structured-cloned view. Policy-free LWW rows, no network or UI query listeners. Timed updates remain between checkpoints after seeding; periodic cache writes are not measured. QueryOne includes open/read/close RPCs for a one-row prefix. 50 samples are descriptive p50/p95/p99 observations, not production latency guarantees. Reopen equality is asserted but open time is not measured.",
+  "results": [
+    {
+      "rows": 1000,
+      "seedMs": 3335.5,
+      "repetitions": 50,
+      "warmups": 3,
+      "samples": [
+        {
+          "dispatchCommitted": 2.7000000001862645,
+          "dispatch": 4.8999999994412065,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.7000000001862645,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 4.900000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 5.099999999627471,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 4.8999999994412065,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7000000001862645,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 4.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7999999998137355,
+          "dispatchCommitted": 2.900000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.599999999627471,
+          "dispatch": 5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.2999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 5.199999999254942,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7999999998137355,
+          "dispatchCommitted": 2.300000000745058,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 5,
+          "queryOne": 1.2999999998137355
+        },
+        {
+          "dispatch": 4.900000000372529,
+          "dispatchCommitted": 2.2999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2000000001862645,
+          "dispatch": 5.199999999254942,
+          "queryOne": 0.10000000055879354
+        },
+        {
+          "dispatch": 4.8999999994412065,
+          "dispatchCommitted": 2.300000000745058,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatchCommitted": 2.2000000001862645,
+          "dispatch": 5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7000000001862645,
+          "dispatchCommitted": 2.2999999998137355,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 4.800000000745058,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatch": 5.1000000005587935,
+          "dispatchCommitted": 2.3999999994412065,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 4.900000000372529,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7999999998137355,
+          "dispatchCommitted": 2.7999999998137355,
+          "queryOne": 1.7000000001862645
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 4.900000000372529,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 5.2000000001862645,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5.599999999627471,
+          "dispatchCommitted": 2.2999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 4.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5.2999999998137355,
+          "dispatchCommitted": 2.599999999627471,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 5.400000000372529,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatch": 5.5,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 4.7000000001862645,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 4.900000000372529,
+          "dispatchCommitted": 3,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 4.900000000372529,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5.199999999254942,
+          "dispatchCommitted": 4,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 5,
+          "queryOne": 0.10000000055879354
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 4.8999999994412065,
+          "queryOne": 0.10000000055879354
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 4.900000000372529,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatch": 5,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.6000000005587935,
+          "dispatch": 5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.8999999994412065,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 9.900000000372529,
+          "queryOne": 2.5
+        },
+        {
+          "dispatch": 5.3999999994412065,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 4.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 4.7999999998137355,
+          "dispatchCommitted": 2.599999999627471,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatchCommitted": 2.599999999627471,
+          "dispatch": 4.7000000001862645,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 4.900000000372529,
+          "dispatchCommitted": 2.2999999998137355,
+          "queryOne": 0.20000000018626451
+        }
+      ],
+      "percentiles": {
+        "dispatch": {
+          "p50": 4.900000000372529,
+          "p95": 5.5,
+          "p99": 9.900000000372529
+        },
+        "dispatchCommitted": {
+          "p50": 2.400000000372529,
+          "p95": 2.900000000372529,
+          "p99": 4
+        },
+        "queryOne": {
+          "p50": 0.20000000018626451,
+          "p95": 1.2999999998137355,
+          "p99": 2.5
+        }
+      },
+      "recovery": {
+        "eventCount": 1106,
+        "discardedTailBytes": 0,
+        "checkpointEvents": 1000,
+        "replayedEvents": 106
+      }
+    },
+    {
+      "rows": 5000,
+      "seedMs": 16565.10000000056,
+      "repetitions": 50,
+      "warmups": 3,
+      "samples": [
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 16.699999999254942,
+          "queryOne": 2.1000000005587935
+        },
+        {
+          "dispatch": 17.299999999813735,
+          "dispatchCommitted": 3.400000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 3.7000000001862645,
+          "dispatch": 17.09999999962747,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatch": 17.799999999813735,
+          "dispatchCommitted": 2.7000000001862645,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 17.300000000745058,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.5,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 16.899999999441206,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.600000000558794,
+          "dispatchCommitted": 2.3999999994412065,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.799999999813735,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatch": 16.899999999441206,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 17.90000000037253,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17,
+          "dispatchCommitted": 2.6000000005587935,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 17.40000000037253,
+          "queryOne": 3.5
+        },
+        {
+          "dispatch": 17.199999999254942,
+          "dispatchCommitted": 2.6000000005587935,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 16.5,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatch": 17.200000000186265,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 16.40000000037253,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.59999999962747,
+          "dispatchCommitted": 2.7000000001862645,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.800000000745058,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.799999999813735,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 17.200000000186265,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 17.90000000037253,
+          "dispatchCommitted": 2.8999999994412065,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.5,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatch": 17.09999999962747,
+          "dispatchCommitted": 2.7999999998137355,
+          "queryOne": 0.10000000055879354
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.90000000037253,
+          "queryOne": 5
+        },
+        {
+          "dispatch": 16.899999999441206,
+          "dispatchCommitted": 4,
+          "queryOne": 0.10000000055879354
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 16.09999999962747,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 17,
+          "dispatchCommitted": 2.6000000005587935,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 17.09999999962747,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatch": 16.899999999441206,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 17.399999999441206,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.40000000037253,
+          "dispatchCommitted": 2.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 17.5,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 16.799999999813735,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.2999999998137355,
+          "dispatch": 17.700000000186265,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatch": 17.09999999962747,
+          "dispatchCommitted": 2.400000000372529,
+          "queryOne": 0.19999999925494194
+        },
+        {
+          "dispatchCommitted": 2.400000000372529,
+          "dispatch": 17,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatch": 17.5,
+          "dispatchCommitted": 4.8999999994412065,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.799999999813735,
+          "queryOne": 3.800000000745058
+        },
+        {
+          "dispatch": 17.09999999962747,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.200000000186265,
+          "queryOne": 0.40000000037252903
+        },
+        {
+          "dispatch": 18.09999999962747,
+          "dispatchCommitted": 2.699999999254942,
+          "queryOne": 0.30000000074505806
+        },
+        {
+          "dispatchCommitted": 2.7999999998137355,
+          "dispatch": 17.200000000186265,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 16.799999999813735,
+          "dispatchCommitted": 2.900000000372529,
+          "queryOne": 0.09999999962747097
+        },
+        {
+          "dispatchCommitted": 2.5,
+          "dispatch": 16.800000000745058,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.700000000186265,
+          "dispatchCommitted": 2.7999999998137355,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 16.5,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17,
+          "dispatchCommitted": 2.5,
+          "queryOne": 0.20000000018626451
+        },
+        {
+          "dispatchCommitted": 2.3999999994412065,
+          "dispatch": 17.90000000037253,
+          "queryOne": 0.2999999998137355
+        },
+        {
+          "dispatch": 17.09999999962747,
+          "dispatchCommitted": 2.7000000001862645,
+          "queryOne": 0.20000000018626451
+        }
+      ],
+      "percentiles": {
+        "dispatch": {
+          "p50": 17.09999999962747,
+          "p95": 17.90000000037253,
+          "p99": 18.09999999962747
+        },
+        "dispatchCommitted": {
+          "p50": 2.5,
+          "p95": 3.7000000001862645,
+          "p99": 4.8999999994412065
+        },
+        "queryOne": {
+          "p50": 0.2999999998137355,
+          "p95": 3.5,
+          "p99": 5
+        }
+      },
+      "recovery": {
+        "eventCount": 5106,
+        "discardedTailBytes": 0,
+        "checkpointEvents": 5000,
+        "replayedEvents": 106
+      }
+    }
+  ]
+}

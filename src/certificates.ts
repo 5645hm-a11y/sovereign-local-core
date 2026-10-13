@@ -3,11 +3,15 @@ import { fromBase64Url, normalizeActorId, normalizeProjectId, toBase64Url } from
 import type { Certificate, ProjectDescriptor, Role } from "./types.js";
 import type { UnlockedIdentity } from "./identity.js";
 import { normalizePolicies } from "./policies.js";
+import { normalizeReadDomainConfig, readDomainEntry, sameReadDomainValue } from "./read-domains.js";
 
 const encoder = new TextEncoder();
 const signing = { name: "ECDSA", hash: "SHA-256" };
 export class AuthorizationError extends Error {
   constructor(message = "Actor has no valid project permission") { super(message); this.name = "AuthorizationError"; }
+}
+export class EpochIncompleteError extends AuthorizationError {
+  constructor() { super("Incomplete epoch pages; receive all committed pages before using the new key"); this.name = "EpochIncompleteError"; }
 }
 export function exactObject(value: unknown, expected: string[]): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
@@ -39,15 +43,18 @@ export async function issueCertificate(identity: UnlockedIdentity, projectId: st
 }
 export function normalizeDescriptor(value: unknown): ProjectDescriptor {
   const version = (value as { version?: unknown } | null)?.version;
-  const d = exactObject(value, ["version", "projectId", "rootActorId", "genesisKeyId", "rootCertificate", "signature", ...(version === 2 ? ["policies"] : [])]);
-  if ((d.version !== 1 && d.version !== 2) || typeof d.genesisKeyId !== "string" || !/^key_[A-Za-z0-9_-]{43}$/.test(d.genesisKeyId)) throw new TypeError("Invalid project descriptor");
+  const d = exactObject(value, ["version", "projectId", "rootActorId", "genesisKeyId", "rootCertificate", "signature", ...(version === 2 || version === 3 ? ["policies"] : []), ...(version === 3 ? ["readDomain"] : [])]);
+  if ((d.version !== 1 && d.version !== 2 && d.version !== 3) || typeof d.genesisKeyId !== "string" || !/^key_[A-Za-z0-9_-]{43}$/.test(d.genesisKeyId)) throw new TypeError("Invalid project descriptor");
   fromBase64Url(d.signature, 64);
-  return Object.freeze({ version: d.version, ...(d.version === 2 ? { policies: normalizePolicies(d.policies) } : {}), projectId: normalizeProjectId(d.projectId), rootActorId: normalizeActorId(d.rootActorId),
+  const policies = d.version === 1 ? undefined : normalizePolicies(d.policies);
+  const readDomain = d.version === 3 ? normalizeReadDomainConfig(d.readDomain) : undefined;
+  if (readDomain && (readDomainEntry(readDomain).projectId !== d.projectId || !sameReadDomainValue(readDomainEntry(readDomain).policies, policies))) throw new TypeError("Domain project/policies disagree with signed routing map");
+  return Object.freeze({ version: d.version, ...(policies ? { policies } : {}), ...(readDomain ? { readDomain } : {}), projectId: normalizeProjectId(d.projectId), rootActorId: normalizeActorId(d.rootActorId),
     genesisKeyId: d.genesisKeyId, rootCertificate: normalizeCertificate(d.rootCertificate), signature: d.signature as string });
 }
 function descriptorTuple(d: ProjectDescriptor): unknown[] {
-  return [d.version === 2 ? "sovereign-local-core/project/v2" : "sovereign-local-core/project/v1", d.version, d.projectId,
-    d.rootActorId, d.genesisKeyId, certificateTuple(d.rootCertificate), d.rootCertificate.signature, ...(d.version === 2 ? [d.policies] : [])];
+  return [`sovereign-local-core/project/v${d.version}`, d.version, d.projectId,
+    d.rootActorId, d.genesisKeyId, certificateTuple(d.rootCertificate), d.rootCertificate.signature, ...(d.version !== 1 ? [d.policies] : []), ...(d.version === 3 ? [d.readDomain] : [])];
 }
 function descriptorText(d: ProjectDescriptor): string { return toBase64Url(encodeBinary(descriptorTuple(d))); }
 export async function signDescriptor(value: ProjectDescriptor, identity: UnlockedIdentity): Promise<ProjectDescriptor> {
@@ -66,6 +73,7 @@ export async function verifyDescriptor(value: unknown): Promise<ProjectDescripto
 export async function verifyCertificate(value: unknown, descriptor: ProjectDescriptor): Promise<Certificate> {
   const c = normalizeCertificate(value);
   if (c.projectId !== descriptor.projectId) throw new AuthorizationError("Certificate belongs to another project");
+  if (descriptor.readDomain && !readDomainEntry(descriptor.readDomain).readRoles.includes(c.role)) throw new AuthorizationError("Certificate role has no read access to this domain");
   const key = await crypto.subtle.importKey("raw", fromBase64Url(c.issuer.slice(5), 65), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
   if (!await crypto.subtle.verify(signing, key, fromBase64Url(c.signature, 64), encodeBinary(certificateTuple(c))) &&
       !await crypto.subtle.verify(signing, key, fromBase64Url(c.signature, 64), encoder.encode(JSON.stringify(certificateTuple(c))))) throw new AuthorizationError("Invalid certificate signature");

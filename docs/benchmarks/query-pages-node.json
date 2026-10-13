@@ -1,0 +1,283 @@
+{
+  "date": "2026-10-12T06:52:34.267Z",
+  "runtime": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "wasmSha256": "46e3953841ee84f8cb9c61fb81ad70e505986bb6539d5f3d38eaf3a548c04f01",
+  "repetitions": 5,
+  "warmups": 1,
+  "scope": "Native results: Node WASM + binary bridge + decoded JS values, trusted roles, no crypto, OPFS, RPC/network or module startup. A first page is a partial result, not a full-result speedup. All complete drains are compared to full snapshots. Core timings separately include real crypto and a simulated flushed file. Medians are not percentile guarantees.",
+  "nativeResults": [
+    {
+      "candidates": 1000,
+      "rows": 200,
+      "decisions": 800,
+      "producerMs": 9.727099999999993,
+      "samples": [
+        {
+          "fullMs": 1.1430000000000007,
+          "itemPageMs": 0.42039999999998656,
+          "decisionPageMs": 0.14849999999999852
+        },
+        {
+          "fullMs": 1.6661000000000001,
+          "itemPageMs": 0.41039999999999566,
+          "decisionPageMs": 0.10320000000000107
+        },
+        {
+          "fullMs": 0.9059999999999917,
+          "itemPageMs": 0.6466999999999956,
+          "decisionPageMs": 0.11250000000001137
+        },
+        {
+          "fullMs": 1.4261999999999944,
+          "itemPageMs": 0.3626000000000005,
+          "decisionPageMs": 0.07880000000000109
+        },
+        {
+          "fullMs": 0.8193999999999875,
+          "itemPageMs": 0.3598999999999961,
+          "decisionPageMs": 0.07579999999998677
+        }
+      ],
+      "medians": {
+        "fullMs": 1.1430000000000007,
+        "itemPageMs": 0.41039999999999566,
+        "decisionPageMs": 0.10320000000000107
+      },
+      "firstItemPage": {
+        "count": 128,
+        "bytes": 53582
+      },
+      "firstDecisionPage": {
+        "count": 128,
+        "bytes": 9032
+      },
+      "linearCapacityBytes": 8388608
+    },
+    {
+      "candidates": 10000,
+      "rows": 2000,
+      "decisions": 8000,
+      "producerMs": 64.0789,
+      "samples": [
+        {
+          "fullMs": 12.311499999999967,
+          "itemPageMs": 0.41610000000002856,
+          "decisionPageMs": 0.10239999999998872
+        },
+        {
+          "fullMs": 11.943099999999959,
+          "itemPageMs": 0.40260000000000673,
+          "decisionPageMs": 0.0906999999999698
+        },
+        {
+          "fullMs": 10.947999999999979,
+          "itemPageMs": 0.48160000000001446,
+          "decisionPageMs": 0.11129999999997153
+        },
+        {
+          "fullMs": 9.81899999999996,
+          "itemPageMs": 0.47350000000000136,
+          "decisionPageMs": 0.09180000000003474
+        },
+        {
+          "fullMs": 9.523300000000006,
+          "itemPageMs": 0.41149999999998954,
+          "decisionPageMs": 0.08979999999996835
+        }
+      ],
+      "medians": {
+        "fullMs": 10.947999999999979,
+        "itemPageMs": 0.41610000000002856,
+        "decisionPageMs": 0.09180000000003474
+      },
+      "firstItemPage": {
+        "count": 128,
+        "bytes": 53582
+      },
+      "firstDecisionPage": {
+        "count": 128,
+        "bytes": 9288
+      },
+      "linearCapacityBytes": 21037056
+    },
+    {
+      "candidates": 50000,
+      "rows": 10000,
+      "decisions": 40000,
+      "producerMs": 282.39670000000007,
+      "samples": [
+        {
+          "fullMs": 52.4443,
+          "itemPageMs": 0.39640000000008513,
+          "decisionPageMs": 0.10559999999998126
+        },
+        {
+          "fullMs": 45.12230000000011,
+          "itemPageMs": 0.39589999999998327,
+          "decisionPageMs": 0.09230000000002292
+        },
+        {
+          "fullMs": 45.58830000000012,
+          "itemPageMs": 0.47289999999998145,
+          "decisionPageMs": 0.09600000000000364
+        },
+        {
+          "fullMs": 45.27099999999996,
+          "itemPageMs": 0.389299999999821,
+          "decisionPageMs": 0.08659999999986212
+        },
+        {
+          "fullMs": 44.41110000000003,
+          "itemPageMs": 0.3944000000001324,
+          "decisionPageMs": 0.0885000000000673
+        }
+      ],
+      "medians": {
+        "fullMs": 45.27099999999996,
+        "itemPageMs": 0.39589999999998327,
+        "decisionPageMs": 0.09230000000002292
+      },
+      "firstItemPage": {
+        "count": 128,
+        "bytes": 53582
+      },
+      "firstDecisionPage": {
+        "count": 128,
+        "bytes": 9544
+      },
+      "linearCapacityBytes": 91029504
+    },
+    {
+      "candidates": 99000,
+      "rows": 19800,
+      "decisions": 79200,
+      "producerMs": 523.8669,
+      "samples": [
+        {
+          "fullMs": 106.0948000000003,
+          "itemPageMs": 0.5240999999996347,
+          "decisionPageMs": 0.16000000000030923
+        },
+        {
+          "fullMs": 106.35770000000002,
+          "itemPageMs": 0.4338999999999942,
+          "decisionPageMs": 0.09679999999980282
+        },
+        {
+          "fullMs": 99.87960000000021,
+          "itemPageMs": 0.41010000000005675,
+          "decisionPageMs": 0.09879999999975553
+        },
+        {
+          "fullMs": 97.98929999999973,
+          "itemPageMs": 0.4000999999998385,
+          "decisionPageMs": 0.08719999999993888
+        },
+        {
+          "fullMs": 103.68299999999999,
+          "itemPageMs": 0.4078999999996995,
+          "decisionPageMs": 0.09179999999969368
+        }
+      ],
+      "medians": {
+        "fullMs": 103.68299999999999,
+        "itemPageMs": 0.41010000000005675,
+        "decisionPageMs": 0.09679999999980282
+      },
+      "firstItemPage": {
+        "count": 128,
+        "bytes": 53582
+      },
+      "firstDecisionPage": {
+        "count": 128,
+        "bytes": 9544
+      },
+      "linearCapacityBytes": 188940288
+    }
+  ],
+  "durableResults": [
+    {
+      "rows": 1000,
+      "samples": [
+        {
+          "legacyMs": 5.56039999999939,
+          "compactMs": 3.3002000000005864,
+          "scopedReadMs": 0.13720000000012078
+        },
+        {
+          "legacyMs": 5.59270000000015,
+          "compactMs": 4.283999999999651,
+          "scopedReadMs": 0.0860000000002401
+        },
+        {
+          "legacyMs": 5.481499999999869,
+          "compactMs": 3.2380999999995765,
+          "scopedReadMs": 0.08249999999952706
+        },
+        {
+          "legacyMs": 5.388600000000224,
+          "compactMs": 3.3128999999998996,
+          "scopedReadMs": 0.12290000000029977
+        },
+        {
+          "legacyMs": 5.7806000000000495,
+          "compactMs": 3.3024999999997817,
+          "scopedReadMs": 0.08460000000013679
+        }
+      ],
+      "medians": {
+        "legacyMs": 5.56039999999939,
+        "compactMs": 3.3024999999997817,
+        "scopedReadMs": 0.0860000000002401
+      },
+      "encodedBytes": 162,
+      "scope": "Real Web Crypto/signature/authorization/native apply and per-event flush into an in-memory test file. The Device copies bytes on writes/flush; this is not OPFS, Worker RPC, a disk durability benchmark or policy replay timing."
+    },
+    {
+      "rows": 10000,
+      "samples": [
+        {
+          "legacyMs": 60.51759999999922,
+          "compactMs": 14.994200000001001,
+          "scopedReadMs": 0.12550000000192085
+        },
+        {
+          "legacyMs": 42.12840000000142,
+          "compactMs": 14.659800000001269,
+          "scopedReadMs": 0.12829999999667052
+        },
+        {
+          "legacyMs": 57.42500000000291,
+          "compactMs": 13.37659999999596,
+          "scopedReadMs": 0.13689999999769498
+        },
+        {
+          "legacyMs": 39.40770000000339,
+          "compactMs": 25.44210000000021,
+          "scopedReadMs": 0.1691999999966356
+        },
+        {
+          "legacyMs": 37.91859999999724,
+          "compactMs": 15.359600000003411,
+          "scopedReadMs": 0.12570000000414439
+        }
+      ],
+      "medians": {
+        "legacyMs": 42.12840000000142,
+        "compactMs": 14.994200000001001,
+        "scopedReadMs": 0.12829999999667052
+      },
+      "encodedBytes": 162,
+      "scope": "Real Web Crypto/signature/authorization/native apply and per-event flush into an in-memory test file. The Device copies bytes on writes/flush; this is not OPFS, Worker RPC, a disk durability benchmark or policy replay timing."
+    }
+  ]
+}

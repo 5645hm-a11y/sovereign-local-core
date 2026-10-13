@@ -18,6 +18,16 @@ test("binary OPFS and default 1000-event checkpoint recover delta after abrupt W
     const core = new LocalCoreClient(); window.localCore = core;
     const opened = await core.open("example-v3", window.demoCredentials);
     const summary = await core.getSyncSummary();
+    core.readMissingEvents = core.readMissingEventsPaged = async () => { throw new Error("Indexed recovery must not use bulk export"); };
+    const cursor = await core.openSyncCursor({ [opened.actorId]: 1000 });
+    const indexed = { events: [], records: 0, bytes: 0 };
+    try {
+      let done = false;
+      while (!done) {
+        const page = await core.readSyncCursor(cursor.id);
+        indexed.events.push(...page.events); indexed.records += page.scannedRecords; indexed.bytes += page.scannedBytes; done = page.done;
+      }
+    } finally { await core.closeSyncCursor(cursor.id); }
     const restored = await core.dispatch({ type: "ITEM_ADDED", itemId: "checkpoint-item", fields: {} });
     await core.close();
     const root = await navigator.storage.getDirectory(), ns = await root.getDirectoryHandle("sovereign-local-core"), dir = await ns.getDirectoryHandle("example-v3");
@@ -25,13 +35,16 @@ test("binary OPFS and default 1000-event checkpoint recover delta after abrupt W
     const view = new DataView(bytes.buffer), frames = []; let at = 0;
     while (at < bytes.length) { const length = view.getUint32(at + 4, true); frames.push(view.getUint32(at, true)); at += 16 + length; }
     const cp = await dir.getFileHandle("checkpoint-0.slc"), cpBytes = new Uint8Array(await (await cp.getFile()).arrayBuffer());
-    return { opened, summary, restored, binary: frames.every(m => m === 0x32434c53), checkpointBytes: cpBytes.length,
+    return { opened, summary, restored, indexed, binary: frames.every(m => m === 0x32434c53), checkpointBytes: cpBytes.length,
       private: ["utf-8", "utf-16le"].every(encoding => !new TextDecoder(encoding).decode(cpBytes).includes("OPFS_CHECKPOINT_SECRET_778")) };
   });
   expect(after.opened.recovery.checkpointEvents).toBe(1000);
   expect(after.opened.recovery.replayedEvents).toBe(1);
   expect(after.opened.snapshot).toEqual(before.snapshot);
   expect(after.summary[before.event.actorId]).toBe(1001);
+  expect(after.indexed.events.map(e => e.id)).toEqual([before.event.id]);
+  expect(after.indexed.records).toBe(1);
+  expect(after.indexed.bytes).toBeLessThan(8192);
   expect(after.restored.event.sequence).toBe(1002);
   expect(after.restored.snapshot.items[0].fields).toEqual({ hidden: "survives", n: 998, secret: "OPFS_CHECKPOINT_SECRET_778" });
   expect(after.binary && after.private && after.checkpointBytes > 0).toBe(true);

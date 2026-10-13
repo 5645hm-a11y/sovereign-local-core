@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-12T18:09:46.882Z",
+  "baselineWasmSha256": "f8012a3b9b7b402db7230288bfe62b2e4f3d072066116dcba071a8b3ded3c887",
+  "updatedWasmSha256": "7cb3fe71708bbdc9e3f5e8d2b39de67b9d7713c32472df1095fad7796f37f302",
+  "seeds": 10,
+  "commandsPerSeed": 384,
+  "snapshotsCompared": 412,
+  "checkpointsCompared": 412,
+  "crossRuntimeRestores": true,
+  "outcome": "equal",
+  "scope": "Two separate compiled WASM instances: captured pre-row-optimization binary vs current. Trusted producer-encoded roles/commands; shuffled mixed-row prefix batches, exact duplicate retries, cross-runtime checkpoints and denied-batch atomicity. Excludes cryptography, storage and network. CI also has a reproducible full-replay checkpoint oracle without this local baseline artifact."
+}

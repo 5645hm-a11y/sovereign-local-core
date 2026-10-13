@@ -17,7 +17,7 @@ npm run build:package
 npm pack --pack-destination artifacts
 
 # Inside any external application, install the generated artifact:
-npm install /path/to/sovereign-local-core-0.2.0.tgz
+npm install /path/to/sovereign-local-core-0.3.0.tgz
 ```
 
 Create `artifacts` before using the last pack command if it does not exist.
@@ -114,6 +114,19 @@ for Map/Set/class instances or expensive projections. The hook uses cached
 follow normal React rules; use `memo` when parent state changes independently.
 See [React's external-store contract](https://react.dev/reference/react/useSyncExternalStore).
 
+Version 0.3.0 `usePagedQuery(queryOptions, { project?, refreshDelayMs? })` consumes
+one native item/decision page. Its `page`, `pageIndex`, `loading`, `error`,
+`canNext`, `next` and `refresh` form a bounded forward-page UI. Relevant commits
+reset to page zero; unrelated ID-prefix writes cause no new read, but invalidate
+continuation and require a safe restart on navigation. React sessions now open
+compactly and fetch full views only for legacy subscribers. See the
+[paged React contract and SSR/lifecycle checks](REACT_PAGED_QUERIES.md).
+
+Native field descriptors also work in `usePagedQuery`: bounded `where` predicates,
+`orderBy` and explicit `index: 'scan'`. Equivalent descriptors do not reset on
+ordinary parent renders; operand changes restart the query. Read
+[field semantics and cold/post-write costs](FIELD_QUERIES.md).
+
 `useStorage(project?)` returns `{status, progress, error, upload, readBlob, pipeTo,
 cancel}`. Each hook allows one active operation; separate hooks may operate
 concurrently within existing transport bounds. Progress is
@@ -189,14 +202,20 @@ Strict Mode cleanup/reopen, real signaling/PeerConnection/DataChannel cleanup an
 a hosted Worker under `worker-src 'self'`. Next fixtures support both
 `npm run build` (Turbopack) and `npm run build:webpack`.
 
-Verified in this workspace: **75 unit tests**, **30 core browser tests**, and all
-**9 installed-package DX browser tests** passed, including task creation, editing,
+The v0.2.0 release was verified with **75 unit tests**, **30 core browser tests**, and
+**9 installed-package DX browser tests**, including task creation, editing,
 reload recovery and cleanup in both public examples. Consumer TypeScript checks and
 Vite production/Next Turbopack production builds passed; the Next Webpack build
 was also exercised during integration. The optional Nostr entry is checked during
 SSR import, consumer type checking and a production bundle under a nested base path.
 The tests use Chrome, React 19.3, Vite 8.3
 and Next 16.4; the React 18 peer range has not been separately exercised here.
+
+Version 0.3.0 read-domain/invariant source passed **81 unit tests**, **32 core Chrome
+tests** and **10 installed-package DX tests**. The additional installed-package
+test creates a generic signed read space with embedded Workers/WASM, verifies
+private-access denial and checks Worker cleanup. Consumer declarations and
+Vite/Next production builds also passed. See [read domains](READ_DOMAINS.md).
 
 ## Public or private registry
 
@@ -214,3 +233,9 @@ npm publish --access public
 For a private registry configure your `.npmrc`, or use an organization-owned scoped
 name and `--access restricted`. GitHub publication and npm publication are separate;
 the npm publish command has not been executed.
+
+
+The v0.3.0 core passed **163 unit tests**, **49 Chrome/OPFS/P2P tests**,
+and **17 installed-package DX tests** (229 total). This includes incremental
+field indexes, generic read domains, paged query hooks and discovery recovery.
+[Publication and exact-artifact installation](PUBLISHING.md).

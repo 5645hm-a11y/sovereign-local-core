@@ -150,6 +150,38 @@ test("native checkpoints retain losing candidates and proofs; restore rejects po
   } finally { checkpoint?.fill(0); native.close(); restored.close(); }
 });
 
+test("native duplicate batches preserve checkpoints and reject changed payloads or roles atomically", async () => {
+  const native = await BinaryProjection.create(libraryPolicies());
+  const command = (sequence, lamport, type, fields) => encodeCommands([{ id: `${alice.actorId}:${sequence}`,
+    actorId: alice.actorId, sequence, lamport, type, itemId: "book_1", fields }]);
+  const add = command(1, 1, "ITEM_ADDED", { title: "Original" });
+  const edit = command(2, 2, "ITEM_UPDATED", { title: "Valid edit" });
+  const loan = command(3, 3, "CHECKOUT", { borrowerId: "reader_A" });
+  let checkpoint;
+  try {
+    native.applyAuthorized([add, loan, loan], ["Admin", "Admin", "Admin"]);
+    checkpoint = native.checkpoint();
+    const snapshot = native.snapshot(3);
+    native.applyAuthorized([loan, add, loan], ["Admin", "Admin", "Admin"]);
+    assert.deepEqual(native.checkpoint(), checkpoint);
+    assert.deepEqual(native.snapshot(3), snapshot);
+    const changed = command(3, 3, "CHECKOUT", { borrowerId: "reader_B" });
+    const changedClock = command(3, 4, "CHECKOUT", { borrowerId: "reader_A" });
+    // New events preceding a conflicting duplicate must not leak into state/history.
+    for (const [block, role] of [[changed, "Admin"], [changedClock, "Admin"], [loan, "Kiosk"]]) {
+      assert.throws(() => native.applyAuthorized([edit, block], ["Admin", role]), e => e.status === 1);
+      assert.deepEqual(native.checkpoint(), checkpoint);
+      assert.deepEqual(native.snapshot(3), snapshot);
+    }
+    // Conflicting copies of a new identity in the same batch also abort atomically.
+    assert.throws(() => native.applyAuthorized([edit, command(2, 2, "ITEM_UPDATED", { title: "Changed" })], ["Admin", "Admin"]), e => e.status === 1);
+    assert.deepEqual(native.checkpoint(), checkpoint);
+    native.applyAuthorized([loan, edit, edit], ["Admin", "Admin", "Admin"]);
+    assert.equal(native.snapshot(3).items[0].fields.title, "Valid edit");
+    assert.equal(native.snapshot(3).decisions.length, 1);
+  } finally { checkpoint?.fill(0); native.close(); }
+});
+
 test("signed unauthorized policy events in a local log fail closed on recovery", async () => {
   const { root, member, make } = await group(), device = new Device();
   const log = await store(device); await log.append(await make(member, 1, "ITEM_DELETED")); await log.close();

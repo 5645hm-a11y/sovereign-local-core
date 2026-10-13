@@ -1,6 +1,6 @@
 # Sovereign wallets, native write policies and deterministic loans
 
-These APIs ship in version 0.2.0. Install its GitHub release artifact using the
+These APIs first shipped in v0.2.0 and remain supported in v0.3.0. Install the latest GitHub release artifact using the
 [README](../README.md), or build from source with [Contributing](../CONTRIBUTING.md).
 Existing email-based clients and policy-free projects remain supported.
 
@@ -101,9 +101,12 @@ Library-managed `loanId`, `borrowerId` and `checkedOutBy` cannot be written thro
 generic add/update commands or selected as owner fields.
 
 These are **write/merge policies**, not row-level confidentiality. Authorized
-members share the project key and can decrypt the project's events regardless
-of write permissions. Read/SELECT isolation needs distinct row/group keys and
-separate key-distribution rules; it is not implemented here.
+members of one project share its key and can decrypt its events regardless of
+write permissions. Released v0.2.0 does not provide read isolation. Version 0.3.0
+[read domains](READ_DOMAINS.md) add descriptor v3 and a logical namespace over
+independently keyed projects with signed role admission and prefix routing.
+This partitions confidential data before it reaches a shared-key log; it does
+not retrofit field confidentiality or arbitrary SELECT predicates into one project.
 
 ## Exclusive checkout state machine
 
@@ -175,13 +178,23 @@ tail. Governance changes rebuild from eligible authoritative history, so a revok
 certificate cannot keep its effects merely because it was cached. Complete invalid
 logs fail closed before incomplete-tail repair; their bytes are preserved.
 
-This first business reducer caps retained history at 100,000 candidates and
-128 MiB of raw command bytes. It stages a candidate-history copy and replays the
-ordered set on ingestion/restore. Those bounds are not a peak-RAM guarantee.
-There is no safe garbage collection of losing history implemented yet. The old
-LWW kernel/checkpoint benchmark numbers do not measure this replay path; no new
-throughput or startup-time claim is made. Per-row indexing, proven stable frontiers
-and escrow are follow-up work, not current capabilities.
+The released v0.2.0 business reducer caps retained history at 100,000 candidates
+and 128 MiB of raw command bytes. It stages a deep candidate-history copy and
+replays the ordered set on ingestion/restore. Those bounds are not a peak-RAM
+guarantee. The v0.3.0 optimization shares immutable candidate payloads
+and skips replay for validated duplicate-only batches. [Affected-row replay](ROW_REPLAY.md)
+now indexes candidates by immutable item ID: suffix arrivals reduce new commands,
+while earlier arrivals replay that row including its losers. Only affected row
+indexes/state and changed decisions are staged; no whole-history index is copied.
+Hot-row vector copies, full checkpoint restore, governance reprojection and query
+serialization through legacy full views remains linear. [Native query pages](QUERY_PAGES.md)
+provide bounded item/decision output and compact write receipts; receipts do not
+assert final business acceptance. See the dedicated [measurements](ROW_REPLAY.md) and
+the historical [released allocation failure](INVARIANTS_BENCHMARKS.md). There is
+no safe losing-history collection. Old LWW kernel/checkpoint numbers do not
+measure this path. Proven stable frontiers, hot-row optimization and escrow
+remain follow-up work; the [next milestone](V0_3_ROADMAP.md) also specifies read
+isolation, migration and encrypted backup requirements.
 
 ## Multi-peer WebRTC mesh
 

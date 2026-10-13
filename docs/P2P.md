@@ -3,6 +3,16 @@
 This page describes the retained `P2PSync` WebSocket signaling API. Since version
 0.2.0 it delegates synchronization to `SyncSession`; encrypted public
 Nostr discovery uses the new `P2PWebRTC` wrapper. See [DISCOVERY.md](DISCOVERY.md).
+
+Version 0.3.0 [recovery and rekeying](DISCOVERY_RECOVERY.md) belong to `P2PWebRTC`:
+normal subscriptions rebind on epoch changes, and an optional independent
+control-only relay lets authorized cold peers recover signed governance. This
+does not change the retained two-peer WebSocket wrapper.
+
+Version 0.3.0 adds [bounded neighbor exploration](SPARSE_OVERLAY.md), with
+authenticated expiring hints, idle-edge rotation and a `topology: 'fixed'` option.
+This is separate from project membership; inspect per-edge states and candidate
+diagnostics rather than interpreting `online` as global connectedness.
 The wire format, external legacy API and native ABI remain compatible.
 `P2PWebRTC` now manages multiple independent edges and enables durable imported-event
 forwarding for sparse meshes. The legacy wrapper remains two-peer/local-commit-only;
@@ -93,7 +103,8 @@ when deployed; TLS termination is external to this minimal relay.
 The channel label `events-v1` is retained and remains ordered/reliable. Logical
 messages now use version 2 and canonical SVB1 binary envelopes; events retain
 encrypted/authorized schema version 3. Both peers must run the new transport;
-the label does not imply compatibility with old JSON v1 clients. Each side sends:
+the label does not imply compatibility with old JSON v1 clients. The released
+v0.2.0 baseline sends:
 
 1. `hello`: `{ v: 2, type: "hello", summary: { actorId: contiguousSequence } }`.
 2. `batch`: `{ v: 2, type: "batch", batchId, events }` for missing events.
@@ -111,7 +122,18 @@ selecting eligible events with sequence above the peer watermark. Ineligible rec
 after learned revocation remain in the append-only audit log but are not sent.
 Filtered actor sequence gaps can cause repeated sparse suffix delivery; compaction
 and policy-aware sequence summaries are future work. At most 4096 actors are
-supported by the v2 handshake; a larger summary is rejected.
+supported by the released/legacy v2 handshake; a larger summary is rejected.
+Version 0.3.0 negotiates [paged-frontier-v1](SYNC_FRONTIERS.md) within binary
+v2: 128-actor / 32 KiB pages, generation/order/completion checks and page ACKs,
+with a defensive 262,144-actor total bound. New cores opt in automatically.
+Small legacy peers remain supported with conservative duplicate traffic; larger
+frontiers require upgrading both ends. Standard clients now use
+[bounded log cursors](SYNC_CURSORS.md) for source-side catch-up, fetching the next
+disk page only after a nonempty batch's durable ACK. This removes the bulk export
+array/decryption step. [Authenticated address indexes](SYNC_INDEX.md) now skip
+known frames in standard OPFS stores; old checkpoints may require a one-time
+rebuild. Sequential/custom fallback still scans history, and custom cores/stores
+without cursor support retain bulk export.
 
 `ingestEvents` validates the entire batch's schema, signatures, project binding,
 certificate chains, revocation eligibility, ciphertext integrity and identity
@@ -125,7 +147,8 @@ advances subsequent local event clocks without consuming the local actor's seque
 The worker emits durable `onCommit` notifications for local and imported events.
 Only local notifications trigger live sends, preventing echo loops. The subscription
 is attached before connection/handshake; live writes during catch-up are queued after
-the local hello. Missed sends during a disconnection remain in OPFS for the next hello.
+the local hello. In paged mode, live sends also await complete bidirectional
+frontiers. Missed sends during a disconnection remain in OPFS for the next hello.
 Received commits can update the UI through the same observer API. Events in observers
 are ciphertext; call `snapshot()` for the authorized local decrypted view.
 
@@ -221,6 +244,15 @@ tampering rejection, vault unlock/reload, and preservation of a poisoned OPFS fi
 The RBAC suite checks outsiders, revoked/backdated writes, encrypted OPFS storage,
 key rotation, late joining, chained Admin delegation, and unauthorized-disk preservation.
 See [the identity contract](IDENTITY.md) and [project encryption](CRYPTO_RBAC.md).
+
+## Compact durable ingestion (v0.3.0)
+
+`SyncSession` prefers optional `ISyncCore.ingestCommitted` and falls back to
+`ingestEvents` for custom/older cores. Admission, merge, append/flush and durable
+ACK order are unchanged; a receipt avoids building a full rows/decisions Snapshot
+for each batch. UI observers can still request full views explicitly. Cursor
+backpressure and interrupted-prefix recovery tests exercise the receipt path.
+See [query/receipt contracts and scopes](QUERY_PAGES.md).
 
 ## References
 

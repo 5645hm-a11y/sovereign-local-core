@@ -8,6 +8,12 @@ verifies the full proof before passing a role to the C++ policy/state-machine
 reducer. This is write authorization, not per-row read encryption: members sharing
 the project key can decrypt all project events. See [policies and loans](POLICIES.md).
 
+Version 0.3.0 descriptor v3 adds signed read-role admission and a complete immutable
+namespace map over independently keyed projects. The general-purpose
+`ReadDomainsClient` handles grants, separate logs/swarms and private records/files;
+see [read-domain contracts](READ_DOMAINS.md). Existing shared-key projects retain
+their current behavior and require an explicit migration for confidentiality.
+
 ## Modules and boundary
 
 | Module | Responsibility |
@@ -172,6 +178,14 @@ the normal client API does not return them.
 
 ## Revocation and offline history
 
+Version 0.3.0 [paged key epochs](PAGED_EPOCHS.md) retain the rules below while
+committing large envelope/witness arrays through signed Merkle pages. The root
+flushes preparation pages before the final manifest. Manifest-first receivers
+enforce revocation immediately but require all pages before key activation and
+historical witness restoration; `EpochIncompleteError` prevents key fallback.
+Small rotations keep the existing inline format. Paging has finite entry/history
+bounds and does not implement constant-memory governance or cold discovery rekeying.
+
 A `MEMBER_REVOKED` event is root-signed and contains:
 
 - The target ActorID; its event Lamport is the cutoff.
@@ -240,9 +254,11 @@ Startup still hashes raw prefix bytes and restores a history-sized deduplication
 Explicit audit/catch-up and governance evaluation still scan history. Streaming,
 compaction and anti-rollback remain future work. Authorization and decryption use
 JS/Web Crypto; projection/checkpoint registers use WASM. See [the WASM contract](WASM.md).
-Limits include 8 certificate delegations, 128 keys
-per invitation, 4,096 history commitments/rotation recipients, 1 MiB stored records,
-and 64 events per incoming batch. Exhausting these limits fails explicitly.
+Limits include 8 certificate delegations, 128 keys per invitation, 1 MiB stored
+records and 64 events per incoming batch. Inline revocations allow 4,096 entries
+per array; v0.3.0 paged epochs allow 65,536 per kind across independently
+bounded pages and at most 32 uncommitted preparation groups. Exhausting these
+limits fails explicitly; paging does not raise the invitation keyring limit.
 
 ## Verification
 

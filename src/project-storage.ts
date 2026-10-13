@@ -6,6 +6,7 @@ import type { UnlockedIdentity } from "./identity.js";
 import type { IdentityOpenOptions, ProjectInvitation } from "./types.js";
 import { encodePolicies } from "./policies.js";
 import { toBase64Url } from "./crypto-codec.js";
+import { normalizeReadDomainConfig, sameReadDomainValue } from "./read-domains.js";
 
 export class ProjectNotInitializedError extends Error {
   constructor() { super("Project is not initialized: create it or supply a trusted invitation"); this.name = "ProjectNotInitializedError"; }
@@ -13,6 +14,7 @@ export class ProjectNotInitializedError extends Error {
 type SyncHandle = FileSystemFileHandle & { createSyncAccessHandle(): Promise<SyncFile> };
 function assertPinnedPolicies(context: ProjectContext, options: IdentityOpenOptions): void {
   if (options.policies && (!context.descriptor.policies || toBase64Url(encodePolicies(options.policies)) !== toBase64Url(encodePolicies(context.descriptor.policies)))) throw new Error("Policies conflict with the pinned descriptor; create a new project for migration");
+  if (options.readDomain && !sameReadDomainValue(normalizeReadDomainConfig(options.readDomain), context.descriptor.readDomain ?? null)) throw new Error("Read domain conflicts with the pinned descriptor");
 }
 /** Stores only public certificates and recipient-encrypted project keys, never raw AES keys. */
 export async function openProject(databaseName: string, identity: UnlockedIdentity, options: IdentityOpenOptions, create: boolean): Promise<ProjectContext> {
@@ -40,7 +42,7 @@ export async function openProject(databaseName: string, identity: UnlockedIdenti
       let context: ProjectContext;
       if (create) {
         if (options.invitation) throw new Error("Cannot create a project using an invitation");
-        context = await ProjectContext.create(identity, options.projectId, options.policies);
+        context = await ProjectContext.create(identity, options.projectId, options.policies, options.readDomain);
       } else {
         if (!options.invitation) throw new ProjectNotInitializedError();
         context = await ProjectContext.open(options.invitation, identity, options.projectId);

@@ -1,0 +1,164 @@
+{
+  "date": "2026-10-09",
+  "runtime": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "scope": "Node WASM BinaryProjection including binary bridge. Trusted roles and producer-encoded decrypted commands. Excludes signatures, certificate checks, AES-GCM, OPFS, network, Worker RPC and module startup. One warm-up plus measured iterations per size; isolated process per size. Memory is observed RSS and reserved linear capacity, not live heap or an exact peak.",
+  "workload": "Up to 1,000 copies, historical CHECKOUT/RETURN pairs, one tail edit, exact duplicate, earlier checkout, binary checkpoint and restore. Restore equality and single late winner are asserted.",
+  "results": [
+    {
+      "outcome": "ok",
+      "candidates": 1000,
+      "finalCandidates": 1002,
+      "books": 100,
+      "commandBytes": 402570,
+      "checkpointBytes": 411306,
+      "producerMs": 11.614799999999995,
+      "linearCapacityBytes": 8388608,
+      "observedRssBytes": 69578752,
+      "samples": [
+        {
+          "initialApplyMs": 3.0397999999999996,
+          "oneTailApplyMs": 1.6173000000000002,
+          "duplicateApplyMs": 1.2827000000000055,
+          "oneLateApplyMs": 1.181200000000004,
+          "snapshotDecodeMs": 1.5608999999999895,
+          "checkpointEncodeMs": 0.37420000000000186,
+          "checkpointRestoreMs": 2.70559999999999
+        },
+        {
+          "initialApplyMs": 2.930899999999994,
+          "oneTailApplyMs": 1.6817999999999955,
+          "duplicateApplyMs": 1.1234999999999928,
+          "oneLateApplyMs": 1.1615999999999929,
+          "snapshotDecodeMs": 1.5430000000000064,
+          "checkpointEncodeMs": 0.39289999999999736,
+          "checkpointRestoreMs": 2.581299999999999
+        },
+        {
+          "initialApplyMs": 2.6987999999999914,
+          "oneTailApplyMs": 1.4575000000000102,
+          "duplicateApplyMs": 1.0887000000000029,
+          "oneLateApplyMs": 1.0603999999999871,
+          "snapshotDecodeMs": 1.646899999999988,
+          "checkpointEncodeMs": 0.35449999999997317,
+          "checkpointRestoreMs": 2.587600000000009
+        }
+      ],
+      "medians": {
+        "initialApplyMs": 2.930899999999994,
+        "oneTailApplyMs": 1.6173000000000002,
+        "duplicateApplyMs": 1.1234999999999928,
+        "oneLateApplyMs": 1.1615999999999929,
+        "snapshotDecodeMs": 1.5608999999999895,
+        "checkpointEncodeMs": 0.37420000000000186,
+        "checkpointRestoreMs": 2.587600000000009
+      }
+    },
+    {
+      "outcome": "ok",
+      "candidates": 10000,
+      "finalCandidates": 10002,
+      "books": 1000,
+      "commandBytes": 4056460,
+      "checkpointBytes": 4137196,
+      "producerMs": 71.4447,
+      "linearCapacityBytes": 63176704,
+      "observedRssBytes": 178454528,
+      "samples": [
+        {
+          "initialApplyMs": 38.62779999999998,
+          "oneTailApplyMs": 23.768100000000004,
+          "duplicateApplyMs": 18.75290000000001,
+          "oneLateApplyMs": 25.04680000000002,
+          "snapshotDecodeMs": 18.687900000000013,
+          "checkpointEncodeMs": 4.8922000000000025,
+          "checkpointRestoreMs": 39.18240000000003
+        },
+        {
+          "initialApplyMs": 34.47140000000002,
+          "oneTailApplyMs": 21.326900000000023,
+          "duplicateApplyMs": 17.043900000000008,
+          "oneLateApplyMs": 17.539199999999937,
+          "snapshotDecodeMs": 13.420499999999947,
+          "checkpointEncodeMs": 4.719900000000052,
+          "checkpointRestoreMs": 34.87270000000001
+        },
+        {
+          "initialApplyMs": 33.78380000000004,
+          "oneTailApplyMs": 22.029699999999934,
+          "duplicateApplyMs": 18.315799999999967,
+          "oneLateApplyMs": 17.523599999999988,
+          "snapshotDecodeMs": 12.843499999999949,
+          "checkpointEncodeMs": 4.088999999999942,
+          "checkpointRestoreMs": 33.235000000000014
+        }
+      ],
+      "medians": {
+        "initialApplyMs": 34.47140000000002,
+        "oneTailApplyMs": 22.029699999999934,
+        "duplicateApplyMs": 18.315799999999967,
+        "oneLateApplyMs": 17.539199999999937,
+        "snapshotDecodeMs": 13.420499999999947,
+        "checkpointEncodeMs": 4.719900000000052,
+        "checkpointRestoreMs": 34.87270000000001
+      }
+    },
+    {
+      "outcome": "ok",
+      "candidates": 50000,
+      "finalCandidates": 50002,
+      "books": 1000,
+      "commandBytes": 20643660,
+      "checkpointBytes": 21044396,
+      "producerMs": 298.1959,
+      "linearCapacityBytes": 331874304,
+      "observedRssBytes": 607383552,
+      "samples": [
+        {
+          "initialApplyMs": 193.03719999999998,
+          "oneTailApplyMs": 106.18560000000002,
+          "duplicateApplyMs": 83.54010000000017,
+          "oneLateApplyMs": 85.74749999999995,
+          "snapshotDecodeMs": 64.4679000000001,
+          "checkpointEncodeMs": 19.006399999999985,
+          "checkpointRestoreMs": 189.24480000000017
+        },
+        {
+          "initialApplyMs": 192.76989999999978,
+          "oneTailApplyMs": 102.26159999999982,
+          "duplicateApplyMs": 114.01789999999983,
+          "oneLateApplyMs": 106.99670000000015,
+          "snapshotDecodeMs": 72.27599999999984,
+          "checkpointEncodeMs": 19.50630000000001,
+          "checkpointRestoreMs": 198.04599999999982
+        },
+        {
+          "initialApplyMs": 203.17680000000018,
+          "oneTailApplyMs": 108.00689999999986,
+          "duplicateApplyMs": 84.92819999999983,
+          "oneLateApplyMs": 87.60000000000036,
+          "snapshotDecodeMs": 65.5275999999999,
+          "checkpointEncodeMs": 19.355199999999968,
+          "checkpointRestoreMs": 193.23660000000018
+        }
+      ],
+      "medians": {
+        "initialApplyMs": 193.03719999999998,
+        "oneTailApplyMs": 106.18560000000002,
+        "duplicateApplyMs": 84.92819999999983,
+        "oneLateApplyMs": 87.60000000000036,
+        "snapshotDecodeMs": 65.5275999999999,
+        "checkpointEncodeMs": 19.355199999999968,
+        "checkpointRestoreMs": 193.23660000000018
+      }
+    }
+  ]
+}

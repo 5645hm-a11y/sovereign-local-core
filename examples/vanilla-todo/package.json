@@ -7,7 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "sovereign-local-core": "file:../../artifacts/sovereign-local-core-0.2.0.tgz"
+    "sovereign-local-core": "file:../../artifacts/sovereign-local-core-0.3.0.tgz"
   },
   "devDependencies": {
     "vite": "^8.3.4"

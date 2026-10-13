@@ -1,6 +1,9 @@
 "use client";
 import { createContext, createElement, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ProjectSession, equalQuery, type ProjectCredentials } from "./react-session.js";
+import { PagedQueryStore } from "./paged-query.js";
+import { normalizeQueryOptions, queryOptionsKey, type QueryOptions } from "./query.js";
+export type { PagedQueryState } from "./paged-query.js";
 import type { Snapshot } from "./types.js";
 import type { StorageProgress, UploadOptions, StorageReadOptions } from "./storage-format.js";
 export type { ProjectCredentials, ProjectState } from "./react-session.js";
@@ -9,7 +12,7 @@ export function useProject(projectId: string, credentials: ProjectCredentials) {
   const wallet = credentials.mode === "wallet";
   const selector = wallet ? credentials.walletId : credentials.email;
   const secret = wallet ? credentials.passphrase : credentials.password;
-  const session = useMemo(() => new ProjectSession(projectId, credentials), [projectId, wallet, selector, secret, credentials.policies,
+  const session = useMemo(() => new ProjectSession(projectId, credentials), [projectId, wallet, selector, secret, credentials.policies, credentials.readDomain,
     credentials.vaultName, credentials.invitation, credentials.databaseName, credentials.createIfMissing, credentials.clientOptions, credentials.p2p]);
   useEffect(() => session.retain(), [session]);
   const state = useSyncExternalStore(session.subscribe, session.getState, session.getServerState);
@@ -72,6 +75,15 @@ export function useLiveQuery<T>(queryFn: (snapshot: Snapshot) => T, options: { p
 export interface StorageHookState {
   readonly status: "idle" | "uploading" | "downloading" | "success" | "error";
   readonly progress: StorageProgress | null; readonly error: Error | null;
+}
+/** One bounded page; relevant commits restart at page zero. No full Snapshot subscription. */
+export function usePagedQuery(query: QueryOptions, options: { project?: ProjectHandle; refreshDelayMs?: number } = {}) {
+  const session = useSession(options.project), normalized = normalizeQueryOptions(query);
+  const descriptor = queryOptionsKey(normalized);
+  const store = useMemo(() => new PagedQueryStore(session, normalized, options.refreshDelayMs),
+    [session, descriptor, options.refreshDelayMs]);
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
+  return useMemo(() => ({ ...state, next: store.next, refresh: store.refresh }), [state, store]);
 }
 export function useStorage(project?: ProjectHandle) {
   const session = useSession(project);

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <new>
@@ -209,6 +210,8 @@ void merge(const uint8_t* buffer, uint32_t size) {
 }
 #include "core_session.inc"
 #include "core_policy.inc"
+#include "core_query_index.inc"
+#include "core_query.inc"
 } // namespace
 
 extern "C" {
@@ -221,20 +224,34 @@ uint32_t core_session_apply(uint32_t id, const uint8_t* buffer, uint32_t size) {
   return with_session(id, [&](auto& s) { if (!heap_input(buffer, size) || s.business) throw InvalidInput{}; apply_session(s, buffer, size); });
 }
 uint32_t core_session_configure(uint32_t id, const uint8_t* buffer, uint32_t size) {
-  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; configure_business(s, buffer, size); });
+  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; configure_business(s, buffer, size); s.query_indexes.reset(); });
 }
 uint32_t core_session_apply_authorized(uint32_t id, const uint8_t* buffer, uint32_t size, uint32_t role) {
   return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; apply_authorized(s, buffer, size, role); });
 }
 uint32_t core_session_snapshot(uint32_t id) { return with_authorized_session(id, [&](auto& s) { snapshot_business(s); }); }
+uint32_t core_session_query(uint32_t id, const uint8_t* buffer, uint32_t size) {
+  clear_output(); const auto s = sessions.find(id); if (s == sessions.end()) return 1;
+  try { if (!heap_input(buffer, size)) throw InvalidInput{}; query_session(*s->second, buffer, size); return 0; }
+  catch (const QueryRecordTooLarge&) { clear_output(); return 4; }
+  catch (const QueryIndexLimit&) { clear_output(); return 5; }
+  catch (const std::bad_alloc&) { clear_output(); return 2; }
+  catch (...) { clear_output(); return 1; }
+}
 uint32_t core_session_checkpoint(uint32_t id) { return with_authorized_session(id, [&](auto& s) { checkpoint_business(s); }); }
 uint32_t core_session_restore(uint32_t id, const uint8_t* buffer, uint32_t size) {
-  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; restore_business(s, buffer, size); });
+  return with_authorized_session(id, [&](auto& s) { if (!heap_input(buffer, size)) throw InvalidInput{}; restore_business(s, buffer, size); s.query_indexes.reset(); });
 }
 uint32_t core_session_reset(uint32_t id) { return with_session(id, [&](auto& s) {
   if (s.business) { auto next = std::make_shared<BusinessState>(); next->policy = s.business->policy; s.business.swap(next); }
-  s.items.clear();
+  s.items.clear(); s.query_indexes.reset();
 }); }
+// Optional read-only diagnostic. Does not invalidate a binary output lease.
+uint32_t core_session_business_work(uint32_t id, uint32_t metric) {
+  const auto s = sessions.find(id); if (s == sessions.end() || !s->second->business) return 0;
+  const auto& w = s->second->business->work;
+  return metric == 0 ? w.rows : metric == 1 ? w.commands : metric == 2 ? w.suffix_rows : metric == 3 ? w.replayed_rows : 0;
+}
 // Status: 0 success; 1 invalid input/size; 2 allocation failure. No partial output on failure.
 uint32_t core_merge(const uint8_t* buffer, uint32_t size) {
   clear_output();

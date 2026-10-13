@@ -1,7 +1,13 @@
 # Encrypted discovery and transport-independent synchronization
 
-These APIs ship in version 0.2.0. Install its GitHub release artifact using the
+These APIs first shipped in v0.2.0 and remain supported in v0.3.0. Install the latest GitHub release artifact using the
 [README](../README.md), or build using [the contribution instructions](../CONTRIBUTING.md).
+
+Version 0.3.0 [discovery recovery](DISCOVERY_RECOVERY.md) adds optional control-only,
+recipient-encrypted relay pulls across key epochs and automatic subscription
+rebinding. Authorized online edges survive; known revoked edges close. A current
+Member can serve recovery without the root online. The extra recovery provider
+is broadcast/opt-in and does not guarantee WAN availability or unlimited scale.
 
 ## Connect authorized project members
 
@@ -57,6 +63,12 @@ flowchart LR
 - `sync-session.ts` owns binary hello, contiguous actor watermarks, catch-up,
   durable ACKs, live notifications and lazy chunk request/response messages.
   It calls the existing core API; it never writes files or merges registers.
+  Version 0.3.0 adds negotiated [paged actor frontiers](SYNC_FRONTIERS.md),
+  including bounded page ACKs and complete-generation checks before event sends.
+  Standard clients also use [fenced log cursors](SYNC_CURSORS.md), with bounded
+  disk reads gated by durable batch ACKs and invalidation on governance changes.
+  [Signed-checkpoint address indexes](SYNC_INDEX.md) skip already-known event
+  frames without changing discovery or the wire protocol.
 - `rtc-byte-link.ts` adapts a reliable ordered DataChannel to Streams with
   bounded queues and RTC buffered-amount backpressure.
 - `discovery-provider.ts` defines the blind control-plane contract below.
@@ -64,6 +76,11 @@ flowchart LR
   checks. Neither providers nor UI receive private or project keys.
 - `p2p-webrtc.ts` owns authenticated per-edge negotiation, ICE, reconnection and lifetime.
 - `nostr-discovery.ts` implements the optional NIP-01 relay adapter.
+
+Version 0.3.0 also supports explicitly configured [routed discovery](DISCOVERY_ROUTING.md):
+bounded presence samples and static per-instance inboxes reduce project-wide
+fanout without changing Worker authentication. It is opt-in; the published
+v0.2.0 artifact and default adapter retain project-wide discovery.
 
 ```ts
 interface IDiscoveryProvider {
@@ -120,7 +137,9 @@ than evicting unexpired entries. A fresh random instance ID, session and mutual
 256-bit challenges additionally protect negotiation after a Worker restart:
 
 1. Encrypted signed `hello` advertises a random instance ID.
-2. The lexicographically smaller instance sends a session-bound challenge.
+2. In v0.2.0, the smaller instance sends a session-bound challenge. Version 0.3.0
+   [neighbor exploration](SPARSE_OVERLAY.md) permits either proposer; crossed
+   proposals select the smaller instance before proof/SDP.
 3. The receiver echoes that challenge and supplies its own fresh challenge.
 4. Offer, answer and ICE must bind both challenges, both instance IDs and the actor.
 

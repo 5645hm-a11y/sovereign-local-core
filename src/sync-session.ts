@@ -1,5 +1,8 @@
 import { encodeWire, decodeWire } from "./binary-events.js";
-import type { IEvent, ISyncCore, SyncSummary } from "./types.js";
+import type { IEvent, ISyncCore, ISyncCursorCore, SyncSummary } from "./types.js";
+import { normalizeSummary, MAX_PAGED_SYNC_ACTORS, SYNC_FRONTIER_PAGE_ACTORS } from "./event-index.js";
+import { createFrontier, FrontierAccumulator, normalizeFrontierManifest, MAX_FRONTIER_PAGE_BYTES,
+  type FrontierManifest, type FrontierPage } from "./sync-frontier.js";
 import { CHUNK_BYTES, CHUNK_OVERHEAD, normalizeChunkRequest, chunkHash,
   type ChunkRequest, type IChunkProvider } from "./storage-format.js";
 export type P2PState = "offline" | "connecting" | "syncing" | "online" | "stopped";
@@ -28,7 +31,9 @@ export interface P2PStats {
 }
 
 type WireMessage =
-  | { v: 2; type: "hello"; summary: SyncSummary }
+  | { v: 2; type: "hello"; summary: SyncSummary; frontier?: FrontierManifest }
+  | ({ v: 2; type: "frontier-page" } & FrontierPage)
+  | { v: 2; type: "frontier-ack"; id: string; index: number }
   | { v: 2; type: "batch"; batchId: string; events: readonly unknown[] }
   | { v: 2; type: "ack"; batchId: string }
   | { v: 2; type: "done" }
@@ -40,6 +45,10 @@ interface Pair {
   closed: boolean; sendQueue: Promise<void>; outboundQueue: Promise<void>; helloSent: Promise<void>;
   acks: Map<string, PendingAck>; sendId: number; receiveId: number; assembly: Assembly | null;
   sawHello: boolean; sentDone: boolean; receivedDone: boolean; deadline: number | null;
+  localFrontier: ReturnType<typeof createFrontier> | null; remoteFrontier: FrontierAccumulator | null;
+  frontierSent: boolean; frontierReceived: boolean;
+  ready: Promise<void>; readyResolve: () => void; readyReject: (error: Error) => void;
+  cursorId: string | null;
   chunk: { requestId: string; hash: string; resolve: (bytes: Uint8Array<ArrayBuffer>) => void; reject: (error: Error) => void; cleanup: () => void } | null;
   servingChunks: number; chunkServeQueue: Promise<void>;
 }
@@ -54,8 +63,15 @@ function wireMessage(value: unknown): WireMessage {
   const message = value as Record<string, unknown>;
   if (message.v !== 2) throw new Error("Unsupported sync version");
   if (message.type === "hello" && message.summary && typeof message.summary === "object") {
-    // The core, not the transport, validates the actual watermark map.
-    return message as unknown as WireMessage;
+    return { v: 2, type: "hello", summary: normalizeSummary(message.summary),
+      ...(message.frontier === undefined ? {} : { frontier: normalizeFrontierManifest(message.frontier) }) };
+  }
+  if (message.type === "frontier-page" || message.type === "frontier-ack") {
+    if (typeof message.id !== "string" || !/^[a-f0-9-]{36}$/.test(message.id) ||
+        !Number.isSafeInteger(message.index) || (message.index as number) < 0 ||
+        (message.index as number) >= Math.ceil(MAX_PAGED_SYNC_ACTORS / SYNC_FRONTIER_PAGE_ACTORS)) throw new Error("Invalid frontier page reference");
+    if (message.type === "frontier-ack") return { v: 2, type: message.type, id: message.id, index: message.index as number };
+    return { v: 2, type: message.type, id: message.id, index: message.index as number, summary: normalizeSummary(message.summary, SYNC_FRONTIER_PAGE_ACTORS) };
   }
   if (message.type === "done") return { v: 2, type: "done" };
   if (message.type === "CHUNK_REQUEST") return { v: 2, type: message.type, request: normalizeChunkRequest(message.request) };
@@ -81,6 +97,9 @@ export class SyncSession {
   private chunkQueue: Promise<void> = Promise.resolve(); private queuedChunkRequests = 0;
   private pendingOutbound = 0;
   private pendingSends = 0;
+  private receiving = false;
+  private partialFrame = false;
+  private lastActivity = Date.now();
   private currentState: P2PState = "offline"; private errorMessage: string | null = null;
   private readonly observers = new Set<(state: P2PState) => void>();
   private readonly counters: P2PStats = { eventsSent: 0, eventsReceived: 0, eventsApplied: 0, batchesSent: 0, pairings: 0, chunksRequested: 0, chunksSent: 0, chunksReceived: 0 };
@@ -92,18 +111,36 @@ export class SyncSession {
   get state(): P2PState { return this.currentState; }
   get lastError(): string | null { return this.errorMessage; }
   get stats(): Readonly<P2PStats> { return { ...this.counters }; }
+  /** Advisory local quiescence for topology maintenance, not a remote-idle guarantee. */
+  get idleForMs(): number {
+    const p = this.pair;
+    return this.currentState === "online" && p && !p.closed && !this.receiving && !this.partialFrame && !p.assembly &&
+      !p.acks.size && !p.chunk && !p.servingChunks && !this.queuedChunkRequests && !this.pendingOutbound && !this.pendingSends
+      ? Math.max(0, Date.now() - this.lastActivity) : 0;
+  }
   onStateChange(observer: (state: P2PState) => void): () => void { this.observers.add(observer); observer(this.currentState); return () => { this.observers.delete(observer); }; }
   connect(link: ByteLink): void {
     if (this.running) throw new Error("Stop the session before supplying another link");
     const size = link.maxFrameBytes ?? FRAME_BYTES;
     if (!Number.isInteger(size) || size <= FRAME_HEADER || size > FRAME_BYTES) throw new Error("Invalid link frame bound");
+    this.receiving = false; this.partialFrame = false; this.lastActivity = Date.now();
     this.link = link; this.reader = link.readable.getReader(); this.writer = link.writable.getWriter(); this.running = true;
+    let readyResolve!: () => void, readyReject!: (error: Error) => void;
+    const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+    void ready.catch(() => {});
     const pair: Pair = { closed: false, sendQueue: Promise.resolve(), outboundQueue: Promise.resolve(), helloSent: Promise.resolve(),
       acks: new Map(), sendId: 0, receiveId: 0, assembly: null, sawHello: false, sentDone: false, receivedDone: false,
-      deadline: null, chunk: null, servingChunks: 0, chunkServeQueue: Promise.resolve() };
+      deadline: null, chunk: null, servingChunks: 0, chunkServeQueue: Promise.resolve(),
+      localFrontier: null, remoteFrontier: null, frontierSent: false, frontierReceived: false, ready, readyResolve, readyReject, cursorId: null };
     this.pair = pair; this.counters.pairings++; this.watchCommits(); this.setState("syncing");
-    pair.deadline = globalThis.setTimeout(() => this.fail(pair, new Error("Sync handshake timed out")), 20000);
-    pair.helloSent = this.core.getSyncSummary().then(summary => this.send(pair, { v: 2, type: "hello", summary }));
+    this.handshakeDeadline(pair);
+    pair.helloSent = this.core.getSyncSummary().then(summary => {
+      this.assertPair(pair);
+      pair.localFrontier = this.core.readMissingEventsPaged ? createFrontier(summary) : null;
+      // Empty is a conservative legacy frontier, never a truncated watermark map.
+      return this.send(pair, { v: 2, type: "hello", summary: pair.localFrontier ? {} : normalizeSummary(summary),
+        ...(pair.localFrontier ? { frontier: pair.localFrontier.manifest } : {}) });
+    });
     void pair.helloSent.catch(error => this.fail(pair, errorOf(error)));
     void this.readLoop(pair, this.reader).catch(error => this.fail(pair, errorOf(error)));
   }
@@ -113,6 +150,7 @@ export class SyncSession {
       const { value, done } = await reader.read(); this.assertPair(pair);
       if (done) throw new Error("Byte stream closed");
       if (!(value instanceof Uint8Array) || value.length > 4 * 1024 * 1024) throw new Error("Invalid or oversized stream chunk");
+      this.lastActivity = Date.now();
       let offset = 0;
       while (offset < value.length) {
         if (!frame) {
@@ -125,9 +163,13 @@ export class SyncSession {
         const count = Math.min(frame.length - frameAt, value.length - offset); frame.set(value.subarray(offset, offset + count), frameAt); frameAt += count; offset += count;
         if (frameAt === frame.length) {
           const message = this.receiveFrame(pair, frame.buffer); frame = null;
-          if (message) { this.assertPair(pair); await this.handleWire(pair, message); }
+          if (message) {
+            this.assertPair(pair); this.receiving = true;
+            try { await this.handleWire(pair, message); } finally { this.receiving = false; this.lastActivity = Date.now(); }
+          }
         }
       }
+      this.partialFrame = prefixAt !== 0 || frame !== null;
     }
   }
   private watchCommits(): void {
@@ -137,6 +179,7 @@ export class SyncSession {
       if ((!this.options.forwardRemote && notification.source !== "local") || !pair || pair.closed) return;
       this.outbound(pair, async () => {
         await pair.helloSent;
+        await pair.ready;
         await this.sendBatch(pair, [notification.event]);
       });
     });
@@ -173,6 +216,22 @@ export class SyncSession {
   }
 
   private async handleWire(pair: Pair, message: WireMessage): Promise<void> {
+    if (message.type === "frontier-page") {
+      if (!pair.sawHello || !pair.remoteFrontier || pair.frontierReceived) throw new Error("Unnegotiated or repeated frontier page");
+      const summary = pair.remoteFrontier.accept(message);
+      this.handshakeDeadline(pair);
+      void this.send(pair, { v: 2, type: "frontier-ack", id: message.id, index: message.index }).catch(error => this.fail(pair, errorOf(error)));
+      if (summary) {
+        pair.remoteFrontier = null; pair.frontierReceived = true;
+        this.completeHandshake(pair);
+        this.catchUp(pair, summary, true);
+      }
+      return;
+    }
+    if (message.type === "frontier-ack") {
+      this.acknowledge(pair, `frontier:${message.id}:${message.index}`);
+      return;
+    }
     if (message.type === "CHUNK_RESPONSE") {
       if (!pair.sawHello) throw new Error("Handshake required before chunks");
       const pending = pair.chunk;
@@ -205,21 +264,27 @@ export class SyncSession {
     if (message.type === "hello") {
       if (pair.sawHello) throw new Error("Repeated handshake");
       pair.sawHello = true;
-      if (pair.deadline !== null) globalThis.clearTimeout(pair.deadline);
-      pair.deadline = null; // Catch-up is bounded per ACK, not by total log replay time.
-      const missing = await this.core.readMissingEvents(message.summary);
-      this.assertPair(pair);
-      // Do not await ACKs in the receive queue: that would deadlock ACK processing.
-      this.outbound(pair, async () => {
-        await pair.helloSent;
-        for (const batch of this.batches(missing)) await this.sendBatch(pair, batch);
-        await this.send(pair, { v: 2, type: "done" });
-        pair.sentDone = true;
-        this.maybeOnline(pair);
-      });
+      const paged = !!message.frontier && !!this.core.readMissingEventsPaged;
+      if (paged) pair.remoteFrontier = new FrontierAccumulator(message.frontier!);
+      // Keep reading while our pages await ACKs; both ends produce concurrently.
+      void pair.helloSent.then(async () => {
+        this.assertPair(pair);
+        if (paged) {
+          if (!pair.localFrontier) throw new Error("Missing local frontier generation");
+          for (const page of pair.localFrontier.pages) {
+            await this.sendAcknowledged(pair, `frontier:${page.id}:${page.index}`, { v: 2, type: "frontier-page", ...page });
+          }
+          pair.localFrontier = null; pair.frontierSent = true; this.completeHandshake(pair); this.maybeOnline(pair);
+        } else {
+          if (pair.localFrontier && pair.localFrontier.manifest.actors > 4096) throw new Error("Peer requires paged-frontier-v1 for more than 4096 actors");
+          pair.localFrontier = null; pair.frontierSent = true; pair.frontierReceived = true;
+          this.completeHandshake(pair);
+          this.catchUp(pair, message.summary, false);
+        }
+      }).catch(error => this.fail(pair, errorOf(error)));
     } else if (message.type === "batch") {
-      if (!pair.sawHello) throw new Error("Handshake required before events");
-      const result = await this.core.ingestEvents(message.events);
+      if (!pair.sawHello || !pair.frontierReceived) throw new Error("Complete handshake required before events");
+      const result = this.core.ingestCommitted ? await this.core.ingestCommitted(message.events) : await this.core.ingestEvents(message.events);
       this.assertPair(pair);
       this.counters.eventsReceived += message.events.length;
       this.counters.eventsApplied += result.applied;
@@ -228,16 +293,61 @@ export class SyncSession {
       // deadlock when both receive loops wait for each other's writable side.
       void this.send(pair, { v: 2, type: "ack", batchId: message.batchId }).catch(error => this.fail(pair, errorOf(error)));
     } else if (message.type === "ack") {
-      const pending = pair.acks.get(message.batchId);
-      if (!pending) throw new Error("Unknown acknowledgement");
-      pair.acks.delete(message.batchId);
-      globalThis.clearTimeout(pending.timer);
-      pending.resolve();
+      this.acknowledge(pair, message.batchId);
     } else {
-      if (!pair.sawHello) throw new Error("Handshake required before catch-up completion");
+      if (!pair.sawHello || !pair.frontierReceived || pair.receivedDone) throw new Error("Complete handshake required before catch-up completion");
       pair.receivedDone = true;
       this.maybeOnline(pair);
     }
+  }
+
+  private handshakeDeadline(pair: Pair): void {
+    if (pair.deadline !== null) globalThis.clearTimeout(pair.deadline);
+    pair.deadline = globalThis.setTimeout(() => this.fail(pair, new Error("Sync frontier handshake timed out")), 20000);
+  }
+  private completeHandshake(pair: Pair): void {
+    if (pair.frontierReceived) {
+      if (pair.deadline !== null) globalThis.clearTimeout(pair.deadline);
+      pair.deadline = null;
+    }
+    if (pair.frontierSent && pair.frontierReceived) pair.readyResolve();
+  }
+  private catchUp(pair: Pair, summary: SyncSummary, paged: boolean): void {
+    this.outbound(pair, async () => {
+      await pair.helloSent;
+      await pair.ready;
+      const cursorCore = this.cursorCore(), cursor = cursorCore ? await cursorCore.openSyncCursor(summary) : null;
+      if (cursor && cursorCore) {
+        pair.cursorId = cursor.id;
+        try {
+          let done = false;
+          while (!done) {
+            this.assertPair(pair);
+            const page = await cursorCore.readSyncCursor(cursor.id);
+            this.assertPair(pair);
+            for (const batch of this.batches(page.events)) await this.sendBatch(pair, batch);
+            done = page.done;
+          }
+        } finally {
+          if (pair.cursorId === cursor.id) pair.cursorId = null;
+          await cursorCore.closeSyncCursor(cursor.id).catch(() => {});
+        }
+      } else {
+        const missing = await (paged ? this.core.readMissingEventsPaged!(summary) : this.core.readMissingEvents(summary));
+        this.assertPair(pair);
+        for (const batch of this.batches(missing)) await this.sendBatch(pair, batch);
+      }
+      this.assertPair(pair);
+      await this.send(pair, { v: 2, type: "done" }); pair.sentDone = true; this.maybeOnline(pair);
+    });
+  }
+  private cursorCore(): ISyncCursorCore | null {
+    return this.core.openSyncCursor && this.core.readSyncCursor && this.core.closeSyncCursor ? this.core as ISyncCore & ISyncCursorCore : null;
+  }
+  private acknowledge(pair: Pair, id: string): void {
+    const pending = pair.acks.get(id);
+    if (!pending) throw new Error("Unknown acknowledgement");
+    pair.acks.delete(id); globalThis.clearTimeout(pending.timer); pending.resolve();
   }
 
   private *batches(events: readonly IEvent[]): Generator<IEvent[]> {
@@ -254,19 +364,22 @@ export class SyncSession {
   }
 
   private async sendBatch(pair: Pair, events: readonly IEvent[]): Promise<void> {
-    this.assertPair(pair);
+    this.counters.eventsSent += events.length;
+    this.counters.batchesSent++;
     const batchId = crypto.randomUUID();
+    await this.sendAcknowledged(pair, batchId, { v: 2, type: "batch", batchId, events });
+  }
+  private async sendAcknowledged(pair: Pair, batchId: string, message: WireMessage): Promise<void> {
+    this.assertPair(pair);
     const acknowledged = new Promise<void>((resolve, reject) => {
       const timer = globalThis.setTimeout(() => {
         pair.acks.delete(batchId);
-        reject(new Error("Durable acknowledgement timed out"));
+        reject(new Error("Sync acknowledgement timed out"));
       }, this.options.acknowledgementTimeoutMs);
       pair.acks.set(batchId, { resolve, reject, timer });
     });
-    this.counters.eventsSent += events.length;
-    this.counters.batchesSent++;
     try {
-      await Promise.all([this.send(pair, { v: 2, type: "batch", batchId, events }), acknowledged]);
+      await Promise.all([this.send(pair, message), acknowledged]);
     } finally {
       const pending = pair.acks.get(batchId);
       if (pending) { globalThis.clearTimeout(pending.timer); pair.acks.delete(batchId); }
@@ -274,11 +387,13 @@ export class SyncSession {
   }
 
   private send(pair: Pair, message: WireMessage): Promise<void> {
+    this.lastActivity = Date.now();
     if (this.pendingSends >= 32) return Promise.reject(new Error("Bounded sync send queue exceeded"));
     this.pendingSends++;
     const result = pair.sendQueue.then(async () => {
       this.assertPair(pair);
       const bytes = encodeWire(message);
+      if (message.type === "frontier-page" && bytes.length > MAX_FRONTIER_PAGE_BYTES) throw new Error("Frontier page exceeds 32 KiB");
       if (bytes.length > MAX_MESSAGE_BYTES) throw new Error("Sync message exceeds 2 MiB");
       const frameBytes = Math.min(FRAME_BYTES, this.link!.maxFrameBytes ?? FRAME_BYTES);
       if (frameBytes <= FRAME_HEADER) throw new Error("Link frame size too small");
@@ -299,7 +414,7 @@ export class SyncSession {
       }
     });
     pair.sendQueue = result.catch(() => {});
-    return result.finally(() => { this.pendingSends--; });
+    return result.finally(() => { this.pendingSends--; this.lastActivity = Date.now(); });
   }
 
   private receiveFrame(pair: Pair, data: unknown): WireMessage | null {
@@ -321,7 +436,9 @@ export class SyncSession {
     assembly.bytes.set(payload, offset); assembly.offset += payload.length;
     if (assembly.offset !== total) return null;
     pair.assembly = null; pair.receiveId = id;
-    return wireMessage(decodeWire(assembly.bytes));
+    const message = wireMessage(decodeWire(assembly.bytes));
+    if (message.type === "frontier-page" && total > MAX_FRONTIER_PAGE_BYTES) throw new Error("Frontier page exceeds 32 KiB");
+    return message;
   }
 
   private outbound(pair: Pair, operation: () => Promise<void>): void {
@@ -340,6 +457,9 @@ export class SyncSession {
       pair.closed = true; if (pair.deadline !== null) clearTimeout(pair.deadline);
       for (const ack of pair.acks.values()) { clearTimeout(ack.timer); ack.reject(new Error("Pairing closed before acknowledgement")); }
       pair.acks.clear(); pair.assembly = null;
+      pair.readyReject(new Error("Pairing closed before complete frontier"));
+      pair.localFrontier = null; pair.remoteFrontier = null;
+      if (pair.cursorId) { void this.cursorCore()?.closeSyncCursor(pair.cursorId).catch(() => {}); pair.cursorId = null; }
       if (pair.chunk) { pair.chunk.cleanup(); pair.chunk.reject(new Error("Pairing closed during chunk pull")); pair.chunk = null; }
     }
     const reader = this.reader, writer = this.writer, link = this.link;
@@ -349,7 +469,7 @@ export class SyncSession {
     if (link) void Promise.resolve(link.close()).catch(() => {});
     this.setState("stopped");
   }
-  private maybeOnline(pair: Pair): void { if (!pair.closed && pair.sentDone && pair.receivedDone) { this.errorMessage = null; this.setState("online"); } }
+  private maybeOnline(pair: Pair): void { if (!pair.closed && pair.frontierSent && pair.frontierReceived && pair.sentDone && pair.receivedDone) { this.errorMessage = null; this.setState("online"); } }
   private assertPair(pair: Pair): void { if (!this.running || pair.closed || this.pair !== pair) throw new Error("Pairing was replaced"); }
   private fail(pair: Pair, error: Error): void {
     if (!this.running || pair.closed || this.pair !== pair) return;

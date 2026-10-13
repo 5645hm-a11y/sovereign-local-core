@@ -17,18 +17,60 @@ async function projects(browser) {
 async function online(...pages) {
   await Promise.all(pages.map(p => expect.poll(() => p.evaluate(() => ({ state: window.sync.state, error: window.sync.lastError })), { timeout: 15000 }).toEqual({ state: "online", error: null })));
 }
-async function blindProvider(page) {
-  await page.evaluate(async () => {
+async function blindProvider(page, syntheticActors = 0) {
+  await page.evaluate(async syntheticActors => {
     const { P2PWebRTC } = await import("/dist/index.js");
     const provider = {
       async start(topic, receive) { window.receivePacket = receive; await window.registerTopic(topic); },
       async publish(packet) { await window.blindPublish([...packet]); },
       stop() { window.receivePacket = null; },
     };
-    window.sync = new P2PWebRTC(window.db, { discovery: provider, iceServers: [], helloIntervalMs: 150, reconnectBaseMs: 100, connectionTimeoutMs: 6000 });
+    let core = window.db;
+    if (syntheticActors) {
+      const { toBase64Url } = await import("/dist/crypto-codec.js");
+      // Synthetic frontier hints are NOT project members or signing identities.
+      // Real Workers still verify every transferred event and persist to OPFS.
+      const hints = {};
+      for (let i = 1; i <= syntheticActors; i++) {
+        const bytes = new Uint8Array(65); bytes[0] = 4; new DataView(bytes.buffer).setUint32(61, i);
+        hints[`p256_${toBase64Url(bytes)}`] = 0;
+      }
+      core = {
+        getSyncSummary: async () => ({ ...await window.db.getSyncSummary(), ...hints }),
+        readMissingEvents: s => window.db.readMissingEvents(s), readMissingEventsPaged: s => window.db.readMissingEventsPaged(s),
+        openSyncCursor: s => window.db.openSyncCursor(s), readSyncCursor: id => window.db.readSyncCursor(id), closeSyncCursor: id => window.db.closeSyncCursor(id),
+        ingestEvents: e => window.db.ingestEvents(e), onCommit: fn => window.db.onCommit(fn),
+        getDiscoveryInfo: () => window.db.getDiscoveryInfo(), sealDiscovery: s => window.db.sealDiscovery(s), openDiscovery: p => window.db.openDiscovery(p),
+      };
+    }
+    window.sync = new P2PWebRTC(core, { discovery: provider, iceServers: [], helloIntervalMs: 150, reconnectBaseMs: 100, connectionTimeoutMs: 6000 });
     window.db.storage.addPeer(window.sync); await window.sync.start();
-  });
+  }, syntheticActors);
 }
+
+test("10k synthetic frontier hints cross real DataChannels; Workers validate events, flush OPFS and recover", async ({ browser }) => {
+  test.setTimeout(60000);
+  const { contexts, a, b } = await projects(browser), topics = new Map();
+  try {
+    for (const page of [a, b]) {
+      await page.exposeFunction("registerTopic", topic => topics.set(page, topic));
+      await page.exposeFunction("blindPublish", async bytes => {
+        const other = page === a ? b : a;
+        if (topics.get(page) === topics.get(other)) await other.evaluate(bytes => window.receivePacket?.(new Uint8Array(bytes)), bytes);
+      });
+    }
+    await Promise.all([blindProvider(a, 10000), blindProvider(b)]); await online(a, b);
+    expect(await b.evaluate(() => window.db.snapshot().then(s => s.items[0]?.fields.text))).toBe("before connection");
+    expect(await a.evaluate(() => window.sync.stats.eventsSent)).toBe(1);
+    await b.evaluate(() => window.db.dispatch({ type: "ITEM_UPDATED", itemId: "initial", fields: { text: "paged live edit" } }));
+    await expect.poll(() => a.evaluate(() => window.db.snapshot().then(s => s.items[0]?.fields.text))).toBe("paged live edit");
+    await b.reload(); await b.evaluate(() => window.ready);
+    expect(await b.evaluate(() => window.db.snapshot().then(s => s.items[0]?.fields.text))).toBe("paged live edit");
+    await blindProvider(b); await online(a, b);
+    await a.evaluate(() => window.db.dispatch({ type: "ITEM_UPDATED", itemId: "initial", fields: { text: "paged after reload" } }));
+    await expect.poll(() => b.evaluate(() => window.db.snapshot().then(s => s.items[0]?.fields.text))).toBe("paged after reload");
+  } finally { await Promise.all(contexts.map(c => c.close())); }
+});
 
 test("two real Workers and DataChannels discover via a blind provider, reject replay/tamper and recover after reload", async ({ browser }) => {
   test.setTimeout(60000);
@@ -87,13 +129,14 @@ test("Nostr adapter routes only encrypted SDP/ICE through a blind WebSocket rela
   test.setTimeout(60000);
   const relay = await startMockNostrRelay(), { contexts, a, b } = await projects(browser);
   try {
-    await Promise.all([a, b].map(p => p.evaluate(async url => {
+    await Promise.all([a, b].map((p, index) => p.evaluate(async ({ url, fixed }) => {
       const { P2PWebRTC } = await import("/dist/index.js");
       const { NostrDiscovery } = await import("/dist/nostr-discovery.bundle.js");
       window.discovery = new NostrDiscovery({ relays: [url], timeoutMs: 1500 });
-      window.sync = new P2PWebRTC(window.db, { discovery: window.discovery, iceServers: [], helloIntervalMs: 150 });
+      window.sync = new P2PWebRTC(window.db, { discovery: window.discovery, iceServers: [], helloIntervalMs: 150,
+        ...(fixed ? { topology: "fixed" } : {}) });
       await window.sync.start();
-    }, relay.url)));
+    }, { url: relay.url, fixed: index === 1 })));
     await online(a, b);
     expect(relay.events.length).toBeGreaterThan(5);
     expect(relay.events.every(e => e.kind === 20000 && /^[0-9a-f]{128}$/.test(e.sig))).toBe(true);

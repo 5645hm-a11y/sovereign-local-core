@@ -1,7 +1,7 @@
 {
   "name": "sovereign-local-core",
-  "version": "0.2.0",
-  "description": "A local-first P2P database with sovereign wallets, native write policies, deterministic invariants, encrypted OPFS and WebRTC mesh sync.",
+  "version": "0.3.0",
+  "description": "A sovereign local-first browser database engine with C++/WASM queries, encrypted OPFS, signed read/write policies and WebRTC sync.",
   "license": "MIT",
   "author": "Sovereign Local Core contributors",
   "keywords": [
@@ -19,7 +19,9 @@
     "react",
     "wallet",
     "row-level-security",
-    "invariants"
+    "invariants",
+    "indexing",
+    "web-crypto"
   ],
   "repository": {
     "type": "git",
@@ -82,6 +84,14 @@
     "demo:react": "npm run dev --prefix examples/react-demo",
     "demo:react:build": "npm run build --prefix examples/react-demo",
     "benchmark": "npm run build && node scripts/benchmark.mjs",
+    "benchmark:invariants": "npm run build && node scripts/benchmark-invariants.mjs",
+    "benchmark:fields": "npm run build && node scripts/benchmark-field-queries.mjs",
+    "benchmark:queries": "npm run build && node scripts/benchmark-queries.mjs",
+    "benchmark:queries:browser": "npm run build && node scripts/benchmark-queries-browser.mjs",
+    "benchmark:sync": "npm run build && node scripts/benchmark-sync-cursor.mjs",
+    "benchmark:discovery": "npm run build:ts && node scripts/benchmark-discovery-routing.mjs",
+    "benchmark:epochs": "npm run build:ts && node scripts/benchmark-epoch-pages.mjs",
+    "benchmark:recovery": "npm run build:ts && node scripts/benchmark-recovery-routing.mjs",
     "benchmark:browser": "npm run build && node scripts/benchmark-browser.mjs",
     "dev": "npm run demo:react",
     "demo:prepare": "node scripts/prepare-examples.mjs",

@@ -1,0 +1,292 @@
+{
+  "date": "2026-10-11T06:49:00.997Z",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "count": 2000,
+  "fields": {
+    "textCodeUnits": 128,
+    "revision": "sequence"
+  },
+  "logBytes": 4769716,
+  "samples": 3,
+  "scope": "Real signed/encrypted source-side catch-up, WASM-validated with resident offset index at setup. In-memory SyncFile; excludes index construction/checkpoint/startup, real OPFS, receiver, RTC and disk flush. Not a browser throughput or peak-RAM benchmark.",
+  "bounds": {
+    "recordsPerPage": 64,
+    "targetRawBytes": 131072,
+    "maximumSingleRecordBytes": 1048576
+  },
+  "results": [
+    {
+      "scenario": "full",
+      "knownSequence": 0,
+      "expectedEvents": 2000,
+      "medians": {
+        "bulk": {
+          "firstBatchMs": 1937.9380999999994,
+          "totalMs": 1940.3225000000002,
+          "firstBatchReadBytes": 4769716,
+          "totalReadBytes": 4769716,
+          "pages": 0,
+          "maxEvents": 2000,
+          "maxRawBytes": 0,
+          "eventCount": 2000
+        },
+        "sequential": {
+          "firstBatchMs": 55.359199999998964,
+          "totalMs": 1998.1483000000007,
+          "firstBatchReadBytes": 131000,
+          "totalReadBytes": 4770292,
+          "pages": 38,
+          "maxEvents": 55,
+          "maxRawBytes": 131010,
+          "eventCount": 2000
+        },
+        "indexed": {
+          "firstBatchMs": 53.71640000000116,
+          "totalMs": 1970.279300000002,
+          "firstBatchReadBytes": 130626,
+          "totalReadBytes": 4769358,
+          "pages": 38,
+          "maxEvents": 55,
+          "maxRawBytes": 131010,
+          "eventCount": 2000
+        }
+      },
+      "measurements": {
+        "bulk": [
+          {
+            "firstBatchMs": 1937.9380999999994,
+            "totalMs": 1940.3225000000002,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 1933.3165999999983,
+            "totalMs": 1935.499499999998,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 1946.2991999999977,
+            "totalMs": 1947.5488000000005,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 2000,
+            "maxRawBytes": 0,
+            "eventCount": 2000
+          }
+        ],
+        "sequential": [
+          {
+            "firstBatchMs": 54.02720000000045,
+            "totalMs": 1998.1483000000007,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 56.59189999999944,
+            "totalMs": 1950.1052999999993,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 55.359199999998964,
+            "totalMs": 1999.7921999999999,
+            "firstBatchReadBytes": 131000,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          }
+        ],
+        "indexed": [
+          {
+            "firstBatchMs": 53.71640000000116,
+            "totalMs": 1970.279300000002,
+            "firstBatchReadBytes": 130626,
+            "totalReadBytes": 4769358,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 53.38119999999981,
+            "totalMs": 1962.179,
+            "firstBatchReadBytes": 130626,
+            "totalReadBytes": 4769358,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          },
+          {
+            "firstBatchMs": 56.571100000001024,
+            "totalMs": 1979.3411000000015,
+            "firstBatchReadBytes": 130626,
+            "totalReadBytes": 4769358,
+            "pages": 38,
+            "maxEvents": 55,
+            "maxRawBytes": 131010,
+            "eventCount": 2000
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "tail20",
+      "knownSequence": 1980,
+      "expectedEvents": 20,
+      "medians": {
+        "bulk": {
+          "firstBatchMs": 1936.9081000000006,
+          "totalMs": 1936.9244000000035,
+          "firstBatchReadBytes": 4769716,
+          "totalReadBytes": 4769716,
+          "pages": 0,
+          "maxEvents": 20,
+          "maxRawBytes": 0,
+          "eventCount": 20
+        },
+        "sequential": {
+          "firstBatchMs": 1991.3594000000012,
+          "totalMs": 1991.3857999999964,
+          "firstBatchReadBytes": 4770292,
+          "totalReadBytes": 4770292,
+          "pages": 38,
+          "maxEvents": 20,
+          "maxRawBytes": 131010,
+          "eventCount": 20
+        },
+        "indexed": {
+          "firstBatchMs": 20.33929999999964,
+          "totalMs": 20.357599999995728,
+          "firstBatchReadBytes": 47760,
+          "totalReadBytes": 47760,
+          "pages": 2,
+          "maxEvents": 20,
+          "maxRawBytes": 47760,
+          "eventCount": 20
+        }
+      },
+      "measurements": {
+        "bulk": [
+          {
+            "firstBatchMs": 2164.4228000000003,
+            "totalMs": 2164.442299999995,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1913.3361000000004,
+            "totalMs": 1913.3554000000004,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1936.9081000000006,
+            "totalMs": 1936.9244000000035,
+            "firstBatchReadBytes": 4769716,
+            "totalReadBytes": 4769716,
+            "pages": 0,
+            "maxEvents": 20,
+            "maxRawBytes": 0,
+            "eventCount": 20
+          }
+        ],
+        "sequential": [
+          {
+            "firstBatchMs": 2037.593799999995,
+            "totalMs": 2037.6180999999997,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1991.3594000000012,
+            "totalMs": 1991.3857999999964,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 1977.8539000000019,
+            "totalMs": 1977.8804999999993,
+            "firstBatchReadBytes": 4770292,
+            "totalReadBytes": 4770292,
+            "pages": 38,
+            "maxEvents": 20,
+            "maxRawBytes": 131010,
+            "eventCount": 20
+          }
+        ],
+        "indexed": [
+          {
+            "firstBatchMs": 25.6675000000032,
+            "totalMs": 25.691200000001118,
+            "firstBatchReadBytes": 47760,
+            "totalReadBytes": 47760,
+            "pages": 2,
+            "maxEvents": 20,
+            "maxRawBytes": 47760,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 20.33929999999964,
+            "totalMs": 20.357599999995728,
+            "firstBatchReadBytes": 47760,
+            "totalReadBytes": 47760,
+            "pages": 2,
+            "maxEvents": 20,
+            "maxRawBytes": 47760,
+            "eventCount": 20
+          },
+          {
+            "firstBatchMs": 19.4149000000034,
+            "totalMs": 19.434000000001106,
+            "firstBatchReadBytes": 47760,
+            "totalReadBytes": 47760,
+            "pages": 2,
+            "maxEvents": 20,
+            "maxRawBytes": 47760,
+            "eventCount": 20
+          }
+        ]
+      }
+    }
+  ]
+}

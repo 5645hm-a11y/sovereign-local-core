@@ -1,7 +1,7 @@
 import type { LocalCore } from "./engine.js";
 import type { IEvent, Snapshot } from "./types.js";
 import { CHUNK_BYTES, CHUNK_OVERHEAD, MAX_FILE_BYTES, chunkPlaintextSize, decryptChunk, encryptChunk, fileId, hashChunk,
-  manifestFields, manifestFromFields, manifestDigest, normalizeManifest, normalizeChunkRequest,
+  manifestFields, manifestFromFields, manifestDigest, normalizeManifest, normalizeChunkRequest, filePrefix,
   type ChunkRequest, type FileManifest, type IBlobStore, type UploadOptions } from "./storage-format.js";
 export * from "./storage-format.js";
 
@@ -31,8 +31,9 @@ export class StorageEngine {
     if (!Number.isSafeInteger(chunkSize) || chunkSize < 65536 || chunkSize > CHUNK_BYTES || Math.ceil(blob.size / chunkSize) > 1024) throw new RangeError("Invalid chunk size or count");
     const access = await this.core.storageKey();
     const chunks = Array.from({ length: Math.ceil(blob.size / chunkSize) }, () => "A".repeat(43));
-    const draft = normalizeManifest({ version: 1, fileId: `file_${crypto.randomUUID()}`, name: options.name ?? ("name" in blob ? (blob as File).name : "unnamed"),
+    const draft = normalizeManifest({ version: 1, fileId: `${filePrefix(options.filePrefix ?? "file_")}${crypto.randomUUID()}`, name: options.name ?? ("name" in blob ? (blob as File).name : "unnamed"),
       mime: options.mime ?? (blob.type || "application/octet-stream"), size: blob.size, chunkSize: options.chunkSize ?? CHUNK_BYTES, keyId: access.keyId, chunks });
+    this.core.assertStorageItemDomain(draft.fileId); // Fail before processing/writing chunks in a wrong domain.
     const descriptor = (await this.core.getProjectInfo()).descriptor;
     let index = 0, processedBytes = 0;
     const progress = () => { try { options.onProgress?.({ direction: "upload", fileId: draft.fileId, completedChunks: index,

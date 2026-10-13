@@ -91,7 +91,7 @@ export async function decryptDiscoveryPayload(packet: Uint8Array<ArrayBuffer>, m
 /** Do not evict unexpired nonces to make room: saturation fails closed. */
 export class DiscoveryReplayWindow {
   private readonly seen = new Map<string, number>();
-  accept(payload: DiscoveryPayload, now = Date.now()): void {
+  accept(payload: Pick<DiscoveryPayload, "actorId" | "nonce" | "issuedAt" | "expiresAt">, now = Date.now()): void {
     if (!Number.isSafeInteger(payload.issuedAt) || !Number.isSafeInteger(payload.expiresAt) || payload.expiresAt <= payload.issuedAt ||
       payload.expiresAt - payload.issuedAt > TTL || payload.issuedAt > now + SKEW || payload.expiresAt < now - SKEW) throw new Error("Expired or invalid discovery time window");
     for (const [nonce, expiry] of this.seen) if (expiry < now) this.seen.delete(nonce);

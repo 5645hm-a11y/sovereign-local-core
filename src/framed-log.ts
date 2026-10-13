@@ -13,6 +13,8 @@ const HEADER_BYTES = 16;
 const BINARY_MAGIC = 0x32434c53; // SLC2
 const MAGIC = 0x31434c53; // SLC1, little-endian
 export const MAX_RECORD_BYTES = 1024 * 1024;
+export const LOG_PAGE_RECORDS = 64;
+export const LOG_PAGE_BYTES = 128 * 1024;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -71,32 +73,44 @@ function readExactly(file: SyncFile, bytes: Uint8Array, offset: number): void {
 
 interface ScanResult { validBytes: number; tailBytes: number }
 
+/** Shared decoder for recovery, full reads and bounded cursor reads. */
+function readFrame(file: SyncFile, offset: number, end: number, budget = Infinity):
+  { record: unknown; next: number } | { deferred: true } | null {
+  if (end - offset < HEADER_BYTES) return null;
+  const headerBytes = new Uint8Array(HEADER_BYTES);
+  readExactly(file, headerBytes, offset);
+  const header = new DataView(headerBytes.buffer), length = header.getUint32(4, true);
+  if (![MAGIC, BINARY_MAGIC].includes(header.getUint32(0, true)) ||
+      header.getUint32(8, true) !== ((~length) >>> 0) || !length || length > MAX_RECORD_BYTES) {
+    throw new LogCorruptionError(offset, "invalid frame header");
+  }
+  if (end - offset - HEADER_BYTES < length) return null;
+  if (HEADER_BYTES + length > budget) return { deferred: true };
+  const payload = new Uint8Array(length);
+  readExactly(file, payload, offset + HEADER_BYTES);
+  if (crc32(payload) !== header.getUint32(12, true)) throw new LogCorruptionError(offset, "checksum mismatch");
+  let record: unknown;
+  try { record = header.getUint32(0, true) === BINARY_MAGIC ? decodeWire(payload) : JSON.parse(decoder.decode(payload)); }
+  catch { throw new LogCorruptionError(offset, "invalid record encoding"); }
+  return { record, next: offset + HEADER_BYTES + length };
+}
+
+export interface LogPage {
+  readonly records: readonly { readonly value: unknown; readonly offset: number; readonly nextOffset: number }[];
+  readonly nextOffset: number;
+  readonly scannedBytes: number;
+}
+
 /** Bounded reads. Validation precedes any truncation, including semantic validation. */
-export function inspectFrames(file: SyncFile, visit: (record: unknown, offset: number) => void, start = 0): ScanResult {
+export function inspectFrames(file: SyncFile, visit: (record: unknown, offset: number, nextOffset: number) => void, start = 0): ScanResult {
   const size = file.getSize();
   if (!Number.isSafeInteger(start) || start < 0 || start > size) throw new LogCorruptionError(start, "invalid recovery offset");
   let offset = start;
   while (offset < size) {
-    if (size - offset < HEADER_BYTES) break;
-    const headerBytes = new Uint8Array(HEADER_BYTES);
-    readExactly(file, headerBytes, offset);
-    const header = new DataView(headerBytes.buffer);
-    const length = header.getUint32(4, true);
-    if (![MAGIC, BINARY_MAGIC].includes(header.getUint32(0, true)) ||
-        header.getUint32(8, true) !== ((~length) >>> 0) || !length || length > MAX_RECORD_BYTES) {
-      throw new LogCorruptionError(offset, "invalid frame header");
-    }
-    if (size - offset - HEADER_BYTES < length) break;
-    const payload = new Uint8Array(length);
-    readExactly(file, payload, offset + HEADER_BYTES);
-    if (crc32(payload) !== header.getUint32(12, true)) {
-      throw new LogCorruptionError(offset, "checksum mismatch");
-    }
-    let record: unknown;
-    try { record = header.getUint32(0, true) === BINARY_MAGIC ? decodeWire(payload) : JSON.parse(decoder.decode(payload)); }
-    catch { throw new LogCorruptionError(offset, "invalid record encoding"); }
-    visit(record, offset);
-    offset += HEADER_BYTES + length;
+    const frame = readFrame(file, offset, size);
+    if (!frame) break;
+    if ("deferred" in frame) throw new Error("Unexpected recovery read budget");
+    visit(frame.record, offset, frame.next); offset = frame.next;
   }
   return { validBytes: offset, tailBytes: size - offset };
 }
@@ -136,6 +150,35 @@ export class FramedLog {
       this.state = "faulted";
       throw error;
     }
+  }
+
+  /** Immutable committed fence; one oversized record is allowed to make progress. */
+  readPage(start: number, end: number): LogPage {
+    this.assertReady();
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end > this.end) throw new RangeError("Invalid log page range");
+    try {
+      if (this.file.getSize() !== this.end) throw new LogCorruptionError(start, "unexpected file size while open");
+      const records: { value: unknown; offset: number; nextOffset: number }[] = []; let offset = start;
+      while (offset < end && records.length < LOG_PAGE_RECORDS && offset - start < LOG_PAGE_BYTES) {
+        const frame = readFrame(this.file, offset, end, records.length ? LOG_PAGE_BYTES - (offset - start) : Infinity);
+        if (!frame) throw new LogCorruptionError(offset, "incomplete frame inside committed cursor fence");
+        if ("deferred" in frame) break;
+        records.push({ value: frame.record, offset, nextOffset: frame.next }); offset = frame.next;
+      }
+      return { records, nextOffset: offset, scannedBytes: offset - start };
+    } catch (error) { this.state = "faulted"; throw error; }
+  }
+
+  /** Read exactly one indexed frame and reject stale/misdirected addresses. */
+  readRecord(offset: number, length: number, end: number): unknown {
+    this.assertReady();
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || length < 17 || length > MAX_RECORD_BYTES + HEADER_BYTES || offset < 0 || !Number.isSafeInteger(end) || end > this.end || offset + length > end) throw new RangeError("Invalid indexed log range");
+    try {
+      if (this.file.getSize() !== this.end) throw new LogCorruptionError(offset, "unexpected file size while open");
+      const frame = readFrame(this.file, offset, offset + length);
+      if (!frame || "deferred" in frame || frame.next !== offset + length) throw new LogCorruptionError(offset, "indexed frame length mismatch");
+      return frame.record;
+    } catch (error) { this.state = "faulted"; throw error; }
   }
 
   append(record: unknown): void {

@@ -153,9 +153,9 @@ test("interrupted catch-up resumes after its durable prefix even when no ACK was
       });
     });
     await b.evaluate(() => {
-      const original = window.db.ingestEvents.bind(window.db);
+      const original = window.db.ingestCommitted.bind(window.db);
       let interrupted = false;
-      window.db.ingestEvents = async events => {
+      window.db.ingestCommitted = async events => {
         if (!interrupted && events.length > 1) {
           interrupted = true;
           const result = await original(events.slice(0, 1));

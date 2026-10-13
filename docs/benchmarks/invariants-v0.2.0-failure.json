@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-09",
+  "runtime": "v24.15.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpu": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+  "compiler": {
+    "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)\r\nCopyright (C) 2026 the Emscripten authors (see AUTHORS.txt)\r\nThis is free and open source software under the MIT license.\r\nThere is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    "standard": "C++20",
+    "optimization": "-O3 -flto",
+    "abi": 1
+  },
+  "scope": "Node WASM BinaryProjection including binary bridge. Trusted roles and producer-encoded decrypted commands. Excludes signatures, certificate checks, AES-GCM, OPFS, network, Worker RPC and module startup. One warm-up plus measured iterations per size; isolated process per size. Memory is observed RSS and reserved linear capacity, not live heap or an exact peak.",
+  "workload": "Up to 1,000 copies, historical CHECKOUT/RETURN pairs, one tail edit, exact duplicate, earlier checkout, binary checkpoint and restore. Restore equality and single late winner are asserted.",
+  "results": [
+    {
+      "outcome": "error",
+      "candidates": 99998,
+      "phase": "oneTailApplyMs",
+      "iteration": 1,
+      "error": {
+        "name": "NativeMergeError",
+        "message": "WASM projection allocation failed",
+        "status": 2
+      }
+    }
+  ]
+}

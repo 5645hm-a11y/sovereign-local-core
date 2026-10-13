@@ -5,17 +5,27 @@ struct Rule { Text prefix, owner; bool library; std::array<uint32_t, 5> masks; }
 struct Policies { bool default_allow; std::vector<Rule> rules; std::vector<uint8_t> bytes; };
 struct Order {
   uint64_t clock, sequence; Text actor;
-  bool operator<(const Order& b) const { return clock != b.clock ? clock < b.clock : actor != b.actor ? actor < b.actor : sequence < b.sequence; }
+  bool operator<(const Order& b) const noexcept { return clock != b.clock ? clock < b.clock : actor != b.actor ? actor < b.actor : sequence < b.sequence; }
 };
 struct Command { Order order; Text item; uint32_t type, role; std::map<Text, OwnedValue> fields; };
 struct Candidate { Command command; std::vector<uint8_t> bytes; };
 struct Decision { Text id, item; uint32_t type, status; };
+struct CandidateLess {
+  bool operator()(const Candidate* a, const Candidate* b) const noexcept { return a->command.order < b->command.order; }
+};
+using Decisions = std::map<const Candidate*, Decision, CandidateLess>;
+using RowHistory = std::vector<const Candidate*>;
+struct BusinessWork { uint32_t rows = 0, commands = 0, suffix_rows = 0, replayed_rows = 0; };
 struct BusinessState {
   Policies policy;
-  std::map<Order, Candidate> history;
+  // Immutable payloads are shared across staged histories, not deep-copied per edit.
+  std::map<Order, std::shared_ptr<const Candidate>> history;
   std::map<Text, Order> identities;
-  std::vector<Decision> decisions;
+  // Raw index pointers refer to immutable candidates owned by history for the entire session.
+  std::map<Text, RowHistory> rows;
+  Decisions decisions;
   uint32_t byte_count = 0;
+  BusinessWork work;
 };
 constexpr uint32_t MAX_POLICY_EVENTS = 100000;
 Text event_id(const Order& o) {
@@ -109,26 +119,36 @@ uint32_t reduce_command(State& state, const Policies& policies, const Command& c
   return 1;
 }
 State replay_business(BusinessState& business) {
-  State state; std::vector<Decision> decisions;
+  // Full canonical replay remains the restore/reference path, independent of delta planning.
+  State state; Decisions decisions; std::map<Text, RowHistory> rows;
   for (const auto& [order, candidate] : business.history) {
-    const auto& c = candidate.command; authorize_command(business.policy, c);
+    const auto& c = candidate->command; authorize_command(business.policy, c);
     const auto status = reduce_command(state, business.policy, c);
-    if (c.type > 3 || status != 1) decisions.push_back({event_id(order), c.item, c.type, status});
+    if (c.type > 3 || status != 1) decisions.emplace_hint(decisions.end(), candidate.get(), Decision{event_id(order), c.item, c.type, status});
+    rows[c.item].push_back(candidate.get());
   }
-  business.decisions.swap(decisions); return state;
+  business.decisions.swap(decisions); business.rows.swap(rows);
+  business.work = {uint32_t(business.rows.size()), uint32_t(business.history.size()), 0, uint32_t(business.rows.size())};
+  return state;
 }
-void add_candidate(BusinessState& business, const uint8_t* bytes, uint32_t size, uint32_t role) {
+void add_candidate(BusinessState& business, const uint8_t* bytes, uint32_t size, uint32_t role, const BusinessState* base = nullptr) {
   auto command = read_command(bytes, size, role); authorize_command(business.policy, command);
   const auto id = event_id(command.order);
-  const auto identity = business.identities.find(id);
-  if (identity != business.identities.end()) {
-    const auto& old = business.history.at(identity->second);
+  // Validate duplicate bytes/proof against both published and intra-batch history.
+  // A duplicate is a no-op only after full parsing and static authorization.
+  for (const auto source : std::array<const BusinessState*, 2>{&business, base}) {
+    if (!source) continue;
+    const auto identity = source->identities.find(id);
+    if (identity == source->identities.end()) continue;
+    const auto& old = *source->history.at(identity->second);
     if (old.command.role != role || old.bytes.size() != size || !std::equal(old.bytes.begin(), old.bytes.end(), bytes)) throw InvalidInput{};
     return;
   }
-  if (business.history.size() >= MAX_POLICY_EVENTS || size > MAX_BYTES - business.byte_count) throw InvalidInput{};
+  const auto previous_count = base ? base->history.size() : 0;
+  const auto previous_bytes = base ? base->byte_count : 0;
+  if (previous_count + business.history.size() >= MAX_POLICY_EVENTS || size > MAX_BYTES - previous_bytes - business.byte_count) throw InvalidInput{};
   const auto order = command.order;
-  business.history.emplace(order, Candidate{std::move(command), std::vector<uint8_t>(bytes, bytes + size)});
+  business.history.emplace_hint(business.history.end(), order, std::make_shared<const Candidate>(Candidate{std::move(command), std::vector<uint8_t>(bytes, bytes + size)}));
   business.identities.emplace(id, order); business.byte_count += size;
 }
 void configure_business(Session& session, const uint8_t* bytes, uint32_t size) {
@@ -137,21 +157,68 @@ void configure_business(Session& session, const uint8_t* bytes, uint32_t size) {
 }
 void apply_authorized(Session& session, const uint8_t* bytes, uint32_t size, uint32_t role) {
   if (!session.business) { if (role < 1 || role > 3) throw InvalidInput{}; apply_session(session, bytes, size); return; }
-  auto next = std::make_shared<BusinessState>(*session.business);
-  if (role) add_candidate(*next, bytes, size, role);
+  // Stage only new candidates first. A denied/malformed batch cannot change the
+  // published session; a duplicate-only batch never clones or replays history.
+  BusinessState staged; staged.policy = session.business->policy;
+  if (role) add_candidate(staged, bytes, size, role, session.business.get());
   else {
     Reader r{bytes, size}; if (r.u32() != 0x32424353 || r.u32() != 2) throw InvalidInput{}; // SCB2 authenticated role/block pairs.
     const auto count = r.u32(); if (r.u32() != size || count > MAX_POLICY_EVENTS) throw InvalidInput{};
-    for (uint32_t i = 0; i < count; ++i) { const auto proof_role = r.u32(), n = r.u32(); add_candidate(*next, r.take(n), n, proof_role); }
+    for (uint32_t i = 0; i < count; ++i) { const auto proof_role = r.u32(), n = r.u32(); add_candidate(staged, r.take(n), n, proof_role, session.business.get()); }
     if (r.offset != r.size) throw InvalidInput{};
   }
-  auto state = replay_business(*next); session.items.swap(state); session.business.swap(next);
+  if (staged.history.empty()) { session.business->work = {}; return; }
+  if (session.business->history.empty()) {
+    // Initial/reset ingestion is already a full staged history. Canonical replay with
+    // ordered decision insertion builds row indexes without per-row delta planning.
+    auto next = std::make_shared<BusinessState>(std::move(staged));
+    auto state = replay_business(*next); session.query_indexes.reset(); session.items.swap(state); session.business.swap(next); return;
+  }
+  auto& business = *session.business;
+  std::map<Text, RowHistory> additions, next_rows;
+  for (const auto& [order, candidate] : staged.history) additions[candidate->command.item].push_back(candidate.get());
+  State changes; Decisions decisions; std::vector<const RowHistory*> replayed;
+  BusinessWork work; work.rows = uint32_t(additions.size());
+  for (const auto& [id, added] : additions) {
+    const auto old = business.rows.find(id);
+    const RowHistory* prior = old == business.rows.end() ? nullptr : &old->second;
+    RowHistory merged; merged.reserve((prior ? prior->size() : 0) + added.size());
+    if (prior) std::merge(prior->begin(), prior->end(), added.begin(), added.end(), std::back_inserter(merged), CandidateLess{});
+    else merged = added;
+    const bool suffix = !prior || prior->empty() || CandidateLess{}(prior->back(), added.front());
+    State row;
+    if (suffix) {
+      const auto previous = session.items.find(id); if (previous != session.items.end()) row.emplace(id, previous->second);
+    } else replayed.push_back(prior);
+    work.commands += uint32_t(suffix ? added.size() : merged.size());
+    if (suffix) work.suffix_rows++; else work.replayed_rows++;
+    // All current predicates are row-local. A late event replays that row's retained losers too.
+    for (const auto candidate : suffix ? added : merged) {
+      const auto& c = candidate->command;
+      const auto status = reduce_command(row, business.policy, c);
+      if (c.type > 3 || status != 1) decisions.emplace(candidate, Decision{event_id(c.order), c.item, c.type, status});
+    }
+    changes.merge(row); next_rows.emplace(id, std::move(merged));
+  }
+  update_query_indexes(session, changes, next_rows);
+  // Parsing, static authorization, reduction, strings, vectors and all map nodes were allocated
+  // before publication. Fixed comparators allocate nothing; node transfers do not allocate.
+  // No history/identity/decision index or unaffected row is copied for a delta.
+  for (const auto prior : replayed) for (const auto candidate : *prior) business.decisions.erase(candidate);
+  business.history.merge(staged.history); business.identities.merge(staged.identities); business.byte_count += staged.byte_count;
+  business.decisions.merge(decisions);
+  while (!next_rows.empty()) {
+    auto node = next_rows.extract(next_rows.begin()); session.items.erase(node.key());
+    business.rows.erase(node.key()); business.rows.insert(std::move(node));
+  }
+  session.items.merge(changes);
+  business.work = work;
 }
 void snapshot_business(const Session& session) {
   snapshot_session(session);
   if (!session.business) return;
   output[4] = 2; append32(uint32_t(session.business->decisions.size()));
-  for (const auto& decision : session.business->decisions) { append_text(decision.id); append_text(decision.item); append32(decision.type); append32(decision.status); }
+  for (const auto& [candidate, decision] : session.business->decisions) { append_text(decision.id); append_text(decision.item); append32(decision.type); append32(decision.status); }
   output_size();
 }
 void checkpoint_business(const Session& session) {
@@ -160,7 +227,7 @@ void checkpoint_business(const Session& session) {
   append32(0x324b4353); append32(2); append32(uint32_t(b.history.size())); append32(0);
   append32(uint32_t(b.policy.bytes.size())); output.insert(output.end(), b.policy.bytes.begin(), b.policy.bytes.end());
   for (const auto& [order, candidate] : b.history) {
-    append32(candidate.command.role); append32(uint32_t(candidate.bytes.size())); output.insert(output.end(), candidate.bytes.begin(), candidate.bytes.end());
+    append32(candidate->command.role); append32(uint32_t(candidate->bytes.size())); output.insert(output.end(), candidate->bytes.begin(), candidate->bytes.end());
     if (output.size() > MAX_BYTES) throw InvalidInput{};
   }
   output_size();

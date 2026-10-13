@@ -5,6 +5,7 @@ import { fromBase64Url, normalizeActorId, normalizeProjectId } from "./crypto-co
 import { exactObject, normalizeCertificate } from "./certificates.js";
 import { normalizeCiphertext, normalizeEnvelope, normalizeInvitation, normalizeKeyId } from "./project-crypto.js";
 import { manifestFromFields } from "./storage-format.js";
+import { normalizeEpochCommitment, normalizeEpochPage } from "./epoch-pages.js";
 
 export function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -95,15 +96,18 @@ export function normalizeUnsignedEvent(value: unknown): UnsignedEvent {
   const expected = ["schemaVersion", "projectId", "id", "actorId", "sequence", "lamport", "type", "certificate"];
   if (input.type === "MEMBER_INVITED") expected.push("invitation");
   else if (input.type === "MEMBER_REVOKED") expected.push("revocation");
+  else if (input.type === "KEY_EPOCH_PAGE") expected.push("epochPage");
   else expected.push("itemId", "keyId", "encryptedFields");
   keys(input, expected);
-  if (input.schemaVersion !== 3) throw new TypeError("Encrypted authorized event schema version 3 required; legacy logs require explicit migration");
+  const paged = input.type === "KEY_EPOCH_PAGE" || (input.type === "MEMBER_REVOKED" &&
+    !!input.revocation && typeof input.revocation === "object" && "epoch" in input.revocation);
+  if (input.schemaVersion !== (paged ? 4 : 3)) throw new TypeError("Unsupported event schema; paged governance requires schema 4, ordinary events schema 3");
   const actorId = normalizeActorId(input.actorId);
   const sequence = positiveInteger(input.sequence, "sequence");
   const lamport = positiveInteger(input.lamport, "lamport");
   if (input.id !== `${actorId}:${sequence}`) throw new TypeError("Event id does not match actor/sequence");
   const metadata = {
-    schemaVersion: 3 as const,
+    schemaVersion: input.schemaVersion as 3 | 4,
     projectId: normalizeProjectId(input.projectId),
     id: input.id,
     actorId,
@@ -112,8 +116,9 @@ export function normalizeUnsignedEvent(value: unknown): UnsignedEvent {
     certificate: normalizeCertificate(input.certificate),
   };
   if (input.type === "MEMBER_INVITED") return Object.freeze({ ...metadata, type: input.type, invitation: normalizeInvitation(input.invitation) });
+  if (input.type === "KEY_EPOCH_PAGE") return Object.freeze({ ...metadata, type: input.type, epochPage: normalizeEpochPage(input.epochPage) });
   if (input.type === "MEMBER_REVOKED") {
-    const r = exactObject(input.revocation, ["targetActorId", "allowedHistory", "keyId", "envelopes"]);
+    const r = exactObject(input.revocation, ["targetActorId", "allowedHistory", "keyId", "envelopes", ...(paged ? ["epoch"] : [])]);
     if (!Array.isArray(r.allowedHistory) || r.allowedHistory.length > 4096 || !Array.isArray(r.envelopes) || r.envelopes.length > 4096) throw new TypeError("Invalid revocation bounds");
     const allowedHistory = r.allowedHistory.map(value => {
       const entry = exactObject(value, ["id", "digest"]);
@@ -122,8 +127,10 @@ export function normalizeUnsignedEvent(value: unknown): UnsignedEvent {
       return Object.freeze({ id: entry.id, digest: entry.digest as string });
     });
     if (new Set(allowedHistory.map(e => e.id)).size !== allowedHistory.length) throw new TypeError("Duplicate history ID");
+    const epoch = paged ? normalizeEpochCommitment(r.epoch) : undefined;
+    if (epoch && (allowedHistory.length || r.envelopes.length)) throw new TypeError("Paged rotation cannot contain inline entries");
     return Object.freeze({ ...metadata, type: input.type, revocation: Object.freeze({ targetActorId: normalizeActorId(r.targetActorId),
-      keyId: normalizeKeyId(r.keyId), allowedHistory: Object.freeze(allowedHistory), envelopes: Object.freeze(r.envelopes.map(normalizeEnvelope)) }) });
+      keyId: normalizeKeyId(r.keyId), allowedHistory: Object.freeze(allowedHistory), envelopes: Object.freeze(r.envelopes.map(normalizeEnvelope)), ...(epoch ? { epoch } : {}) }) });
   }
   if (!["ITEM_ADDED", "ITEM_UPDATED", "ITEM_DELETED", "FILE_ADDED", "CHECKOUT", "RETURN"].includes(input.type as string)) throw new TypeError("Unsupported event type");
   return Object.freeze({ ...metadata, type: input.type as ItemCommand["type"], itemId: identifier(input.itemId, "itemId"),
@@ -140,7 +147,7 @@ export function normalizeEvent(value: unknown): IEvent {
 /** Domain-separated fixed tuple; field pairs are ordinal-sorted. Signature is not part of its own payload. */
 export function canonicalEventBytes(value: UnsignedEvent): Uint8Array<ArrayBuffer> {
   const event = normalizeUnsignedEvent(value);
-  const body = event.type === "MEMBER_INVITED" ? event.invitation : event.type === "MEMBER_REVOKED" ? event.revocation :
+  const body = event.type === "MEMBER_INVITED" ? event.invitation : event.type === "MEMBER_REVOKED" ? event.revocation : event.type === "KEY_EPOCH_PAGE" ? event.epochPage :
     { itemId: event.itemId, keyId: event.keyId, encryptedFields: event.encryptedFields };
   return encodeWire(["sovereign-local-core/event-binary/v1", event.schemaVersion, event.projectId, event.id,
     event.actorId, event.sequence, event.lamport, event.certificate, event.type, body]);
@@ -149,7 +156,7 @@ export function canonicalEventBytes(value: UnsignedEvent): Uint8Array<ArrayBuffe
 /** Read-only compatibility transcript for already signed JSON v3 history. New events never use it. */
 export function legacyEventText(value: UnsignedEvent): string {
   const e = normalizeUnsignedEvent(value);
-  const body = e.type === "MEMBER_INVITED" ? e.invitation : e.type === "MEMBER_REVOKED" ? e.revocation :
+  const body = e.type === "MEMBER_INVITED" ? e.invitation : e.type === "MEMBER_REVOKED" ? e.revocation : e.type === "KEY_EPOCH_PAGE" ? e.epochPage :
     [e.itemId, e.keyId, e.encryptedFields.iv, e.encryptedFields.ciphertext];
   return JSON.stringify(["sovereign-local-core/event/v3", e.schemaVersion, e.projectId, e.id, e.actorId, e.sequence, e.lamport, e.certificate, e.type, body]);
 }

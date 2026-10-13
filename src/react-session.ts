@@ -1,6 +1,6 @@
 import { LocalCoreClient, type LocalCoreClientOptions } from "./client.js";
 import { P2PSync, type P2PState, type P2PSyncOptions } from "./p2p-sync.js";
-import type { EmailIdentityOpenOptions, WalletOpenOptions, Snapshot } from "./types.js";
+import type { EmailIdentityOpenOptions, WalletOpenOptions, Snapshot, CommitNotification } from "./types.js";
 
 export type ProjectCredentials = (Omit<EmailIdentityOpenOptions, "projectId"> | Omit<WalletOpenOptions, "projectId">) & {
   readonly databaseName?: string;
@@ -31,8 +31,10 @@ export class ProjectSession {
   private unsubscribers: (() => void)[] = [];
   private state: ProjectState = initial;
   private view: Snapshot | null = null;
+  private viewDirty = true;
   private readonly stateListeners = new Set<() => void>();
   private readonly viewListeners = new Set<() => void>();
+  private readonly commitListeners = new Set<(notification: CommitNotification) => void>();
   private refreshing = false;
   private dirty = false;
   constructor(readonly projectId: string, private readonly credentials: ProjectCredentials) {}
@@ -40,11 +42,25 @@ export class ProjectSession {
   getServerState = () => initial;
   getView = () => this.view;
   subscribe = (listener: () => void) => { this.stateListeners.add(listener); return () => { this.stateListeners.delete(listener); }; };
-  subscribeView = (listener: () => void) => { this.viewListeners.add(listener); return () => { this.viewListeners.delete(listener); }; };
+  subscribeView = (listener: () => void) => {
+    this.viewListeners.add(listener);
+    if (this.core && this.refs && (this.viewDirty || !this.view)) this.refresh();
+    return () => {
+      this.viewListeners.delete(listener);
+      if (!this.viewListeners.size) {
+        this.dirty = false;
+        // Same-render selector resubscriptions can reacquire before this cleanup.
+        queueMicrotask(() => { if (!this.viewListeners.size) this.view = null; });
+      }
+    };
+  };
+  subscribeCommits = (listener: (notification: CommitNotification) => void) => {
+    this.commitListeners.add(listener); return () => { this.commitListeners.delete(listener); };
+  };
   private publish(value: ProjectState) { this.state = Object.freeze(value); for (const fn of this.stateListeners) fn(); }
-  private publishView(value: Snapshot) { this.view = value; for (const fn of this.viewListeners) fn(); }
+  private publishView(value: Snapshot) { this.view = value; this.viewDirty = this.dirty; for (const fn of this.viewListeners) fn(); }
   retain(): () => void {
-    if (this.disposed) { this.disposed = false; this.started = false; this.view = null; this.state = initial; }
+    if (this.disposed) { this.disposed = false; this.started = false; this.view = null; this.viewDirty = true; this.state = initial; }
     this.refs++;
     if (!this.started) { this.started = true; enqueue(() => this.open()); }
     return () => {
@@ -54,6 +70,7 @@ export class ProjectSession {
         // Effect replay reacquires before this queued cleanup; actual unmount closes everything.
         if (this.refs) return;
         this.disposed = true;
+        this.view = null; this.viewDirty = true; this.dirty = false;
         for (const unsubscribe of this.unsubscribers.splice(0)) unsubscribe();
         this.sync?.stop(); this.sync = null;
         const client = this.core; this.core = null;
@@ -69,16 +86,21 @@ export class ProjectSession {
       client = new LocalCoreClient(clientOptions);
       this.core = client;
       const options = { ...identity, projectId: this.projectId };
-      let opened;
-      try { opened = await client.open(databaseName, options); }
+      try { await client.openCompact(databaseName, options); }
       catch (error) {
         if (!createIfMissing || options.invitation || asError(error).name !== "ProjectNotInitializedError") throw error;
-        opened = await client.createProject(databaseName, options);
+        await client.createProjectCompact(databaseName, options);
       }
       if (!this.refs) return; // Queued cleanup will release this client's lease.
-      this.unsubscribers.push(client.onCommit(() => this.refresh()));
-      this.publishView(opened.snapshot);
+      this.unsubscribers.push(client.onCommit(notification => {
+        this.viewDirty = true;
+        if (!this.viewListeners.size) this.view = null;
+        for (const listener of this.commitListeners) { try { listener(notification); } catch { /* Isolate observers. */ } }
+        if (this.viewListeners.size) this.refresh();
+      }));
+      this.view = null; this.viewDirty = true;
       this.publish({ status: "ready", client, connection: "offline", error: null });
+      if (this.viewListeners.size) this.refresh();
       if (p2p) {
         this.sync = new P2PSync(client, p2p);
         this.unsubscribers.push(client.storage.addPeer(this.sync));
@@ -94,14 +116,15 @@ export class ProjectSession {
     }
   }
   private refresh(): void {
+    if (!this.viewListeners.size) return;
     this.dirty = true;
     if (this.refreshing) return;
     this.refreshing = true;
     void (async () => {
       try {
-        while (this.dirty && this.core && this.refs) {
+        while (this.dirty && this.core && this.refs && this.viewListeners.size) {
           this.dirty = false; const view = await this.core.snapshot();
-          if (this.refs && !this.disposed) this.publishView(view);
+          if (this.refs && !this.disposed && this.viewListeners.size) this.publishView(view);
         }
       } catch (error) { if (this.refs && !this.disposed) this.publish({ ...this.state, error: asError(error) }); }
       finally { this.refreshing = false; }

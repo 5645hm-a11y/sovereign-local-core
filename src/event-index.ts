@@ -3,10 +3,13 @@ import type { IEvent, SyncSummary } from "./types.js";
 import { compareText, canonicalEventBytes } from "./validation.js";
 import { normalizeActorId } from "./crypto-codec.js";
 
-export function normalizeSummary(value: unknown): SyncSummary {
+export const MAX_PAGED_SYNC_ACTORS = 262144;
+export const SYNC_FRONTIER_PAGE_ACTORS = 128;
+
+export function normalizeSummary(value: unknown, maximumActors = 4096): SyncSummary {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Invalid sync summary");
   const entries = Object.entries(value);
-  if (entries.length > 4096) throw new RangeError("Sync summary exceeds 4096 actors");
+  if (entries.length > maximumActors) throw new RangeError(`Sync summary exceeds ${maximumActors} actors`);
   const summary: Record<string, number> = Object.create(null);
   for (const [actorId, sequence] of entries.sort(([a], [b]) => compareText(a, b))) {
     normalizeActorId(actorId);

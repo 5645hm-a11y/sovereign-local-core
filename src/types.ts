@@ -34,6 +34,24 @@ export interface ReducerPolicies {
   readonly defaultAllow: boolean;
   readonly rules: readonly RowPolicy[];
 }
+/** One independently keyed project in a signed logical database namespace. */
+export interface ReadDomainDefinition {
+  readonly id: string;
+  readonly prefixes: readonly string[];
+  readonly readRoles: readonly Role[];
+  readonly policies: ReducerPolicies;
+}
+export interface ReadDomainEntry extends ReadDomainDefinition { readonly projectId: string }
+export interface ReadDomainSpace {
+  readonly version: 1;
+  readonly spaceId: string;
+  readonly domains: readonly ReadDomainEntry[];
+}
+export interface ReadDomainConfig {
+  readonly domainId: string;
+  /** The complete immutable routing map is signed in every domain descriptor. */
+  readonly space: ReadDomainSpace;
+}
 export interface EventDecision {
   readonly eventId: string;
   readonly itemId: string;
@@ -51,9 +69,11 @@ export interface Certificate {
   readonly signature: string;
 }
 export interface ProjectDescriptor {
-  readonly version: 1 | 2;
-  /** Required and root-signed in descriptor v2; immutable for this project. */
+  readonly version: 1 | 2 | 3;
+  /** Required and root-signed in descriptor v2/v3; immutable for this project. */
   readonly policies?: ReducerPolicies;
+  /** Descriptor v3 partitions reads into independent projects with role-restricted admission. */
+  readonly readDomain?: ReadDomainConfig;
   readonly projectId: string;
   readonly rootActorId: string;
   readonly genesisKeyId: string;
@@ -80,9 +100,28 @@ export interface Revocation {
   readonly allowedHistory: readonly { readonly id: string; readonly digest: string }[];
   readonly keyId: string;
   readonly envelopes: readonly KeyEnvelope[];
+  /** Opt-in paged rotation. Inline arrays must be empty when this is present. */
+  readonly epoch?: EpochCommitment;
 }
+export interface HistoryWitness { readonly id: string; readonly digest: string }
+export interface EpochCommitment {
+  readonly id: string; readonly version: 1; readonly pageSize: 128;
+  readonly keyCount: number; readonly historyCount: number;
+  readonly keyRoot: string; readonly historyRoot: string;
+}
+export type EpochPage = {
+  readonly epochId: string; readonly keyId: string; readonly targetActorId: string;
+  readonly commitment: EpochCommitment; readonly index: number; readonly proof: readonly string[];
+} & ({ readonly kind: "keys"; readonly entries: readonly KeyEnvelope[] } |
+  { readonly kind: "history"; readonly entries: readonly HistoryWitness[] });
+export interface PendingEpoch {
+  readonly manifestId: string; readonly keyId: string;
+  readonly missingKeyPages: number; readonly missingHistoryPages: number;
+}
+export interface RevokeOptions { readonly paged?: boolean }
+export interface RevokeResult { readonly event: IEvent; readonly snapshot: Snapshot; readonly pageCount?: number }
 export interface EventMetadata {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 3 | 4;
   readonly projectId: string;
   readonly id: string;
   readonly actorId: string;
@@ -93,7 +132,8 @@ export interface EventMetadata {
 export type EventBody =
   | { readonly type: ItemCommand["type"]; readonly itemId: string; readonly keyId: string; readonly encryptedFields: Ciphertext }
   | { readonly type: "MEMBER_INVITED"; readonly invitation: ProjectInvitation }
-  | { readonly type: "MEMBER_REVOKED"; readonly revocation: Revocation };
+  | { readonly type: "MEMBER_REVOKED"; readonly revocation: Revocation }
+  | { readonly type: "KEY_EPOCH_PAGE"; readonly epochPage: EpochPage };
 export type UnsignedEvent = EventMetadata & EventBody;
 
 export type IEvent = UnsignedEvent & { readonly signature: string };
@@ -108,6 +148,7 @@ export interface EmailIdentityOpenOptions {
   /** Defaults to a hash of the normalized email; demos use explicit isolated vault names. */
   readonly vaultName?: string;
   readonly policies?: ReducerPolicies;
+  readonly readDomain?: ReadDomainConfig;
 }
 export interface WalletOpenOptions {
   readonly mode: "wallet";
@@ -117,10 +158,11 @@ export interface WalletOpenOptions {
   readonly invitation?: ProjectInvitation;
   readonly vaultName?: string;
   readonly policies?: ReducerPolicies;
+  readonly readDomain?: ReadDomainConfig;
 }
 export type IdentityOpenOptions = EmailIdentityOpenOptions | WalletOpenOptions;
-export type IdentityCredentials = Omit<EmailIdentityOpenOptions, "projectId" | "invitation" | "policies"> |
-  Omit<WalletOpenOptions, "projectId" | "invitation" | "policies">;
+export type IdentityCredentials = Omit<EmailIdentityOpenOptions, "projectId" | "invitation" | "policies" | "readDomain"> |
+  Omit<WalletOpenOptions, "projectId" | "invitation" | "policies" | "readDomain">;
 
 export interface ItemView {
   readonly id: string;
@@ -159,7 +201,37 @@ export interface ILocalStore {
   append(event: IEvent): Promise<AppendResult>;
   /** Reads and validates the actual file, rather than returning an in-memory cache. */
   readEvents(): Promise<readonly IEvent[]>;
+  /** Optional bounded committed-log reads. endOffset must be an append boundary. */
+  readonly endOffset?: number;
+  readEventPage?(start: number, end: number): Promise<StoredEventPage>;
+  /** Optional local-only indexed selection; never grants admission to returned events. */
+  openMissingEventScan?(summary: SyncSummary, end: number): Promise<StoredEventScan>;
   close(): Promise<void>;
+}
+
+export interface StoredEventPage {
+  readonly events: readonly IEvent[];
+  readonly nextOffset: number;
+  readonly scannedRecords: number;
+  readonly scannedBytes: number;
+}
+export interface SyncCursorHandle { readonly id: string; readonly endOffset: number }
+export interface StoredEventScan {
+  readPage(): Promise<SyncEventPage>;
+  close(): void;
+}
+export interface SyncEventPage {
+  readonly events: readonly IEvent[];
+  readonly done: boolean;
+  readonly scannedRecords: number;
+  readonly scannedBytes: number;
+}
+export interface ISyncCursorCore {
+  /** null permits an explicit compatibility fallback for stores without bounded reads. */
+  openSyncCursor(summary: SyncSummary): Promise<SyncCursorHandle | null>;
+  readSyncCursor(cursorId: string): Promise<SyncEventPage>;
+  /** Idempotent cleanup, including after completion/expiry/connection loss. */
+  closeSyncCursor(cursorId: string): Promise<void>;
 }
 
 export interface ICRDTMerge {
@@ -177,11 +249,21 @@ export interface IngestResult {
   readonly summary: SyncSummary;
   readonly snapshot: Snapshot;
 }
+/** A durable event receipt is not final business acceptance or global finality. */
+export interface CommitReceipt { readonly event: IEvent; readonly lamport: number; readonly revision: number }
+export interface IngestReceipt { readonly applied: number; readonly summary: SyncSummary; readonly lamport: number; readonly revision: number }
 
 /** Transport depends only on this boundary; validation, storage and merge stay in the core. */
 export interface ISyncCore {
   getSyncSummary(): Promise<SyncSummary>;
   readMissingEvents(summary: SyncSummary): Promise<readonly IEvent[]>;
+  /** Opt-in to paged-frontier-v1. The frontier is bounded on wire, not a partial replication view. */
+  readMissingEventsPaged?(summary: SyncSummary): Promise<readonly IEvent[]>;
+  openSyncCursor?: ISyncCursorCore["openSyncCursor"];
+  readSyncCursor?: ISyncCursorCore["readSyncCursor"];
+  closeSyncCursor?: ISyncCursorCore["closeSyncCursor"];
   ingestEvents(events: readonly unknown[]): Promise<IngestResult>;
+  /** Optional small receipt path; full Snapshot materialization is skipped. */
+  ingestCommitted?(events: readonly unknown[]): Promise<IngestReceipt>;
   onCommit(listener: (notification: CommitNotification) => void): () => void;
 }

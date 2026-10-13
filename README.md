@@ -1,6 +1,6 @@
 # Sovereign Local Core
 
-**A Zero-Server, Local-First P2P Database for the Web.**
+**A Zero-Server, Local-First P2P Database Engine for the Web.**
 
 Put the database inside your application. Sovereign Local Core stores signed,
 encrypted events in the browser, materializes them with a C++/WebAssembly CRDT,
@@ -11,18 +11,78 @@ files through encrypted streams instead of putting file bytes in the database lo
 [Quick start](#quick-start) · [Examples](examples/README.md) · [Architecture](#architecture)
 · [Benchmarks](docs/WASM_BENCHMARKS.md) · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
 
-**Status: experimental, version 0.2.0.** This is a working, tested database core,
+**Status: experimental, version 0.3.0.** This is a working, tested database core,
 not a drop-in Supabase replacement or an independently audited security product.
 "Zero-server" means no database or authentication server is required for local
 operation. Online peer discovery uses signaling relays; internet connectivity
-may also need STUN/TURN. Version 0.2.0 supports encrypted public Nostr
+may also need STUN/TURN. Public Nostr relays support encrypted peer
 discovery, removing the need to operate your own signaling server.
 
-**New in 0.2.0: authority lives on devices.** Sovereign wallets unlock local
-identities without an Auth server. Root-signed certificates establish roles,
-and C++/WASM enforces immutable row write policies and deterministic checkout
-invariants. A bounded WebRTC mesh synchronizes their signed, encrypted history.
-See the [changelog](CHANGELOG.md) and [policy contracts](docs/POLICIES.md).
+**New in 0.3.0: query less, replay less, keep writes fast.** Native scalar
+filters, ordered keyset pages and incremental indexes avoid rebuilding a field
+index after ordinary edits. Compact startup/receipts and `usePagedQuery` avoid
+whole-database views. Independently keyed read domains, affected-row invariant
+replay and bounded P2P/discovery recovery extend the same engine across projects.
+Sovereign wallets and signed write policies remain part of the core. This release
+is a database SDK; applications choose their own schemas, interfaces and workflows.
+
+## 100,000 rows. 0.15 ms indexed reads after an edit.
+
+The recorded Node/WASM workload returns the **complete matching result** rather
+than comparing an indexed page with a full database scan. On 100,000 rows, a
+post-edit equality query returns 101 matching rows after maintaining two indexes.
+
+| Operation on 100,000 rows | Median |
+| --- | ---: |
+| Indexed equality read immediately after an edit | **0.15 ms** |
+| Edit plus maintenance of two cached indexes | **0.13 ms** |
+| Initial index build plus equality read | 24.95 ms |
+| Same original equality result through a complete bounded scan | 15.84 ms |
+
+Measured on Intel Core i7-10700, Node 24.15.0 and Emscripten 6.0.11: one warm-up,
+five samples. These include the native reducer/binary bridge and JS query decoding,
+plus producer encoding for the edit. **They exclude OPFS, cryptography, Worker RPC,
+network and startup**; they are not end-to-end browser response guarantees.
+[Exact workload, raw samples and reproduction](docs/INCREMENTAL_INDEXES.md).
+
+**The database core runs in a Dedicated Worker.** WASM materialization, validation,
+OPFS synchronous I/O and native query work execute away from the UI thread.
+Bounded pages and compact receipts limit data sent back to application code.
+Rendering, main-thread callbacks, packaging startup and transport work can still
+consume UI time; this release does not claim measured zero long tasks in every app.
+Initial builds, large deltas and restore retain additional costs.
+
+Version 0.3.0 adds [cryptographic read domains](docs/READ_DOMAINS.md): a general
+namespace for arbitrary records/files over separately keyed projects, with signed
+read grants and routing enforced by the core. These APIs are included in the v0.3.0 artifact. See [current scalability bounds](docs/SCALABILITY.md) before
+sizing a project; unlimited user counts or histories are not established.
+
+Version 0.3.0 sync also supports [paged actor frontiers](docs/SYNC_FRONTIERS.md):
+bounded 128-actor pages, per-page backpressure and durable reconnect, tested with
+10,000 synthetic actors/hints. [Bounded log cursors](docs/SYNC_CURSORS.md) now
+feed catch-up directly from OPFS in 64-record / 128 KiB pages under durable ACK
+backpressure. [Authenticated address indexes](docs/SYNC_INDEX.md) now skip known
+frames for small deltas and restore from signed checkpoints. Index memory and
+cold prefix verification still grow with history. [Bounded neighbor exploration](docs/SPARSE_OVERLAY.md)
+now rotates eligible idle edges to reconnect previously separate components.
+Opt-in [routed discovery](docs/DISCOVERY_ROUTING.md) samples presence buckets and
+targets signaling to stable instance inboxes. A 10k synthetic presence model
+records 99.60% fewer deliveries; it is not a 10k-user throughput test. Adaptive
+layouts and guaranteed global connectedness remain work.
+
+Version 0.3.0 [paged key epochs](docs/PAGED_EPOCHS.md) split large revocations into
+root-signed, Merkle-verified key/witness pages. Cutover is crash-recoverable and
+blocks new-epoch operations until all pages arrive. The synthetic 10k-record
+fixture bounds the largest signed record to 81,434 bytes; whole-history memory,
+invitation keyrings and cold discovery after rotation remain finite constraints.
+
+Version 0.3.0 [discovery recovery](docs/DISCOVERY_RECOVERY.md) lets offline authorized
+peers retrieve signed epoch controls from another current Member, with recipient
+encryption and no data/SDP on the stable recovery channel. Normal discovery now
+rebinds automatically. Opt-in [routed recovery](docs/RECOVERY_ROUTING.md) samples
+probes and sends selected transfers between dedicated inboxes; unselected offers
+allocate no cursor. Plain providers retain broadcast mode. Reachable current
+replicas, matching layouts and further adaptive/rate work remain necessary.
 
 ## Features
 
@@ -48,7 +108,12 @@ See the [changelog](CHANGELOG.md) and [policy contracts](docs/POLICIES.md).
   The new WebRTC wrapper connects multiple peers with independent per-edge retries.
 - **Encrypted file streams.** Fixed-size chunks stay outside the CRDT log.
   SHA-256 and AES-GCM verify lazy pulls; only file metadata synchronizes eagerly.
-- **Optional React hooks.** `useProject`, `useLiveQuery` and `useStorage` handle
+- **Native indexed queries.** Scalar AND predicates, deterministic ordering,
+  bounded pages and incremental caches run in C++/WASM. Small writes retain
+  indexes; explicit resource limits keep builds and output accountable.
+- **Cryptographic read domains.** Signed routing and independent project keys
+  separate private records/files from shared data. Write policies remain native.
+- **Optional React hooks.** `useProject`, `usePagedQuery`, `useLiveQuery` and `useStorage` handle
   lifecycle, selected views, progress and cancellation. The browser core has no
   runtime NPM dependencies; React is an optional peer. The separate Nostr adapter
   bundles a small secp256k1 dependency and its MIT notice.
@@ -62,46 +127,54 @@ applications do not need a C++ compiler. Chrome is the browser tested in this re
 Install the GitHub release artifact today:
 
 ```sh
-npm install https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.2.0/sovereign-local-core-0.2.0.tgz
+npm install https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.0/sovereign-local-core-0.3.0.tgz
 ```
 
-The intended NPM name is `sovereign-local-core`; registry publication is pending.
-After an NPM release, installation will be `npm install sovereign-local-core`.
+The package is prepared under the NPM name `sovereign-local-core`. Registry
+publication is pending authentication; `npm install sovereign-local-core` becomes
+available after that separate publication. The GitHub artifact works now.
 To build and install from source instead, see [Contributing](CONTRIBUTING.md).
 
 ### Vanilla TypeScript
 
-Supply credentials from your UI and retain the random project ID to reopen it.
-`createProject` initializes a new Admin root; a member needs an Admin-signed invitation.
+Supply a local wallet ID and passphrase from your UI. Retain the random project
+ID to reopen it. Creating a project makes a new Admin root; joining someone
+else's project requires its pinned root and an Admin-signed invitation.
 
 ```ts
 import { LocalCoreClient } from 'sovereign-local-core';
 
-export async function openTasks(email: string, password: string, projectId: string) {
+export async function openRecords(walletId: string, passphrase: string, projectId: string) {
   const db = new LocalCoreClient();
-  const credentials = { email, password, projectId }; // Password: at least 12 characters.
+  const credentials = { mode: 'wallet' as const, walletId, passphrase, projectId };
+  // Passphrase: at least 12 characters. Credentials unlock a random-key local vault.
   try {
-    try { await db.open(projectId, credentials); }
+    try { await db.openCompact(projectId, credentials); }
     catch (error) {
       if (!(error instanceof Error) || error.name !== 'ProjectNotInitializedError') throw error;
-      await db.createProject(projectId, credentials);
+      await db.createProjectCompact(projectId, credentials);
     }
+    await db.dispatchCommitted({
+      type: 'ITEM_ADDED', itemId: `record_${crypto.randomUUID()}`,
+      fields: { title: 'My first local record', status: 'open', priority: 1 },
+    }); // Resolves after the signed encrypted event is flushed.
+
+    const cursor = await db.openQueryCursor({
+      kind: 'items', prefix: 'record_', limit: 32,
+      where: [{ field: 'status', op: 'eq', value: 'open' }],
+      orderBy: { field: 'priority', direction: 'desc' },
+    });
+    try { console.log((await db.readQueryCursor(cursor.id)).items); }
+    finally { await db.closeQueryCursor(cursor.id); }
+    return { db, dispose: () => db.close() };
   } catch (error) { await db.close().catch(() => {}); throw error; }
-
-  await db.dispatch({
-    type: 'ITEM_ADDED', itemId: `task_${crypto.randomUUID()}`,
-    fields: { kind: 'task', title: 'Ship something local-first', done: false },
-  }); // Resolves after the event is flushed.
-
-  const tasks = (await db.snapshot()).items.filter(item => item.fields.kind === 'task');
-  console.log(tasks);
-  const unsubscribe = db.onCommit(() => void db.snapshot().then(console.log));
-  return { db, dispose: async () => { unsubscribe(); await db.close(); } };
 }
 ```
 
 Call `dispose()` when your app is done with the client. Reopening with the same
-origin, credentials and project ID restores the encrypted local log and view.
+origin, wallet, passphrase and project ID restores the encrypted local log and view.
+The first bounded page is shown above; read until `page.done` for all results.
+Legacy email/password vault selectors and full-Snapshot APIs remain supported.
 Complete add/update/delete UI: [Vanilla To-Do](examples/vanilla-todo/src/main.ts).
 
 ### React
@@ -111,27 +184,30 @@ In Next.js App Router, keep this component behind a `"use client"` boundary.
 
 ```tsx
 'use client';
-import { useProject, ProjectProvider, useLiveQuery } from 'sovereign-local-core/react';
-import type { LocalCoreClient } from 'sovereign-local-core';
+import { useProject, usePagedQuery } from 'sovereign-local-core/react';
 
-export function Project({ email, password, projectId }: { email: string; password: string; projectId: string }) {
-  const project = useProject(projectId, { email, password, createIfMissing: true });
-  if (project.status === 'error') return <p>{project.error?.message}</p>;
-  if (project.status !== 'ready' || !project.client) return <p>Opening local database…</p>;
-  return <ProjectProvider project={project}><Tasks client={project.client}/></ProjectProvider>;
-}
-
-function Tasks({ client }: { client: LocalCoreClient }) {
-  const { data: tasks = [] } = useLiveQuery(
-    view => view.items.filter(item => item.fields.kind === 'task')
-  ); // Pure projection; unrelated CRDT changes retain the selected result.
+export function Records({ walletId, passphrase, projectId }: {
+  walletId: string; passphrase: string; projectId: string;
+}) {
+  const project = useProject(projectId, {
+    mode: 'wallet', walletId, passphrase, createIfMissing: true,
+  });
+  const query = usePagedQuery({
+    kind: 'items', prefix: 'record_', limit: 32,
+    where: [{ field: 'status', op: 'eq', value: 'open' }],
+    orderBy: { field: 'priority', direction: 'desc' },
+  }, { project });
   async function add() {
-    await client.dispatch({ type: 'ITEM_ADDED', itemId: `task_${crypto.randomUUID()}`,
-      fields: { kind: 'task', title: 'My first task', done: false } });
+    await project.client?.dispatchCommitted({
+      type: 'ITEM_ADDED', itemId: `record_${crypto.randomUUID()}`,
+      fields: { title: 'My first record', status: 'open', priority: 1 },
+    });
   }
   return <>
-    <button onClick={() => void add().catch(console.error)}>Add task</button>
-    <ul>{tasks.map(task => <li key={task.id}>{task.fields.title}</li>)}</ul>
+    {(project.error || query.error) && <p role="alert">{(project.error || query.error)?.message}</p>}
+    <button disabled={project.status !== 'ready'} onClick={() => void add().catch(console.error)}>Add record</button>
+    <ul>{query.page?.items.map(row => <li key={row.id}>{String(row.fields.title)}</li>)}</ul>
+    <button disabled={!query.canNext} onClick={query.next}>Next page</button>
   </>;
 }
 ```
@@ -161,7 +237,7 @@ counts durable local preparation; peers pull files later. [Storage contract](doc
 ### Global P2P through public discovery
 
 Both clients must already have valid project membership. These APIs are included
-in the 0.2.0 package above; no application-owned signaling server is required.
+in the 0.3.0 package above; no application-owned signaling server is required.
 
 ```ts
 import { P2PWebRTC } from 'sovereign-local-core';
@@ -179,32 +255,72 @@ with your TURN service when direct connectivity fails. Relays cannot read the
 encrypted SDP/ICE, but see their connecting clients' IP addresses and traffic
 metadata. [Discovery contract, TURN configuration and tests](docs/DISCOVERY.md).
 
-### Sovereign wallets and business policies
+### Bounded reads and compact durable writes (v0.3.0)
 
-Wallet and policy APIs are included in 0.2.0. Policies are immutable and
-signed by the project root. The library preset restricts Book writes and permits
-certified kiosks to check out a copy:
+The package includes `dispatchCommitted` and `ingestCommitted` receipts without full
+Snapshot output, plus native query cursors for item-ID prefixes and decisions.
+SyncSession selects compact ingestion automatically when the core supports it.
 
 ```ts
-import { LocalCoreClient, libraryPolicies } from 'sovereign-local-core';
+await db.dispatchCommitted({ type: 'ITEM_ADDED', itemId: 'record_1', fields: { title: 'Local' } });
+const cursor = await db.openQueryCursor({ kind: 'items', prefix: 'record_', limit: 64, maxBytes: 32768 });
+try {
+  while (true) {
+    const page = await db.readQueryCursor(cursor.id);
+    consumeRows(page.items);
+    if (page.done) break;
+  }
+} finally { await db.closeQueryCursor(cursor.id); }
+```
 
+New writes invalidate a cursor's revision; restart an incomplete consistent read.
+A durable receipt is not final invariant acceptance. Existing Snapshot/React APIs
+retain full-view behavior. [Contracts, scopes and measured Chrome latencies](docs/QUERY_PAGES.md).
+
+React includes `usePagedQuery({ kind: 'items', prefix: 'record_', limit: 64 },
+{ project })`: one retained page, selective commit refresh and safe first-page
+restart after invalidation. React projects open compactly; a full view is requested
+only by a legacy subscriber or explicit API. [Hook lifecycle and limits](docs/REACT_PAGED_QUERIES.md).
+
+Field queries add `where: [{ field: 'status', op: 'eq', value: 'open' }]`
+and `orderBy: { field: 'priority', direction: 'desc' }` to native cursors and
+`usePagedQuery`. Two disposable indexes per session support typed equality/ranges;
+small writes maintain cached indexes; initial builds, maintenance and post-write
+reads are measured separately. Large deltas and restores still rebuild.
+[Semantics, limits and benchmarks](docs/FIELD_QUERIES.md).
+
+### Sovereign wallets and business policies
+
+Wallets and policies are part of the core. A project root signs immutable rules;
+the Worker verifies event signatures and certificate chains, then the native
+reducer applies the authenticated role to the matching row policy.
+
+```ts
+import { LocalCoreClient, type ReducerPolicies } from 'sovereign-local-core';
+
+const policies: ReducerPolicies = {
+  version: 1, defaultAllow: false,
+  rules: [{ prefix: 'record_', ownerField: null, library: false,
+    create: ['Admin', 'Member'], update: ['Admin', 'Member'], delete: ['Admin'],
+    checkout: [], return: [] }],
+};
 const db = new LocalCoreClient();
-await db.createProject('library_replica', {
-  mode: 'wallet', walletId: 'admin_desk', passphrase: userSuppliedPassphrase,
-  projectId, policies: libraryPolicies('book_'),
-});
-await db.dispatch({ type: 'ITEM_ADDED', itemId: 'book_copy_1', fields: { title: 'CRDTs' } });
-const { event, snapshot } = await db.dispatch({ type: 'CHECKOUT', itemId: 'book_copy_1',
-  fields: { borrowerId: 'reader_42' } });
-console.log(snapshot.decisions?.find(d => d.eventId === event.id));
-await db.dispatch({ type: 'RETURN', itemId: 'book_copy_1', fields: { checkoutId: event.id } });
+await db.createProjectCompact(replicaName, {
+  mode: 'wallet', walletId, passphrase, projectId, policies,
+}); // Parameters come from your application; no external Auth server.
+await db.dispatchCommitted({ type: 'ITEM_ADDED', itemId: 'record_1', fields: { title: 'Protected record' } });
+const { invitation } = await db.inviteMember(memberPublicKey, 'Member');
+// Deliver this invitation through an authenticated channel. Members cannot delete record_ rows.
 await db.close();
 ```
 
-Signed unauthorized writes are rejected before append. Invariant conflicts stay
-in the durable log and are recomputed when earlier events arrive: offline acceptance
-is provisional. Write policies do not hide rows from other project key holders.
-See [wallet, policy, invariant and mesh contracts](docs/POLICIES.md).
+Signed unauthorized writes are rejected before append. Conditional invariants
+retain conflict decisions in the durable log and recompute them when earlier
+events arrive; offline acceptance is provisional. The built-in exclusive-resource
+checkout/return reducer is a concrete invariant, not arbitrary smart-contract code.
+See [policy and invariant contracts](docs/POLICIES.md). Write policies alone do
+not hide rows from project key holders: use [independently keyed read domains](docs/READ_DOMAINS.md)
+for private records/files.
 
 ## Architecture
 
@@ -234,7 +350,7 @@ discovery path encrypts and authenticates these messages inside the Worker.
 [Core contracts](docs/CORE.md) · [Identity](docs/IDENTITY.md)
 · [RBAC and encryption](docs/CRYPTO_RBAC.md) · [P2P](docs/P2P.md) · [Native ABI](docs/WASM.md)
 
-## Measured, not promised
+## Recovery and replay measurements
 
 In the recorded encrypted OPFS workload of **1,006 events**, checkpoint recovery
 had a median of **389.6 ms**, compared with **4,765.5 ms** for full replay. A separate
@@ -242,9 +358,20 @@ had a median of **389.6 ms**, compared with **4,765.5 ms** for full replay. A se
 excludes cryptography, disk and the bridge. Results depend on hardware and workload.
 Full context, raw data and reproduction commands: [Benchmarks](docs/WASM_BENCHMARKS.md).
 
+Business-policy replay uses a different path. Its [dedicated measurements](docs/INVARIANTS_BENCHMARKS.md)
+include a v0.2.0 allocation failure near 100k candidates and the subsequent
+immutable-candidate/duplicate optimization. Version 0.3.0 [affected-row replay](docs/ROW_REPLAY.md)
+now reduces only new row suffixes or the affected row after a late arrival. At
+99,998 retained candidates across 1,000 rows, Node WASM plus bridge tail apply
+measured 204.06 ms before / 0.06 ms after; this excludes crypto, disk and query
+delivery. A late event on one hot row still replays its full history. The
+[release scope and remaining roadmap](docs/V0_3_ROADMAP.md) distinguishes shipped
+read/query/sync improvements from future verified backups and other work; recovery and memory costs remain.
+
 ## Scope and limits
 
-Version 0.2.0 supports scalar-field LWW records, project membership,
+Version 0.3.0 supports scalar-field LWW records, sovereign wallets, project
+membership, cryptographic read domains, native scalar queries/incremental indexes,
 a bounded multi-peer mesh, row write policies and an exclusive-checkout view.
 It does not implement SQL,
 text CRDTs, arbitrary business contracts, distributed transactions, consensus
