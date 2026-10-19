@@ -25,7 +25,7 @@ run([npm, "install", `../../../artifacts/${archive}`], next);
 // The optional adapter must also be safe to import during SSR before browser use.
 run(["--input-type=module", "-e", 'await import("sovereign-local-core/nostr")'], demo);
 run([resolve(root, "node_modules/typescript/bin/tsc"), "--ignoreConfig", "--noEmit", "--strict", "--jsx", "react-jsx", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext", "consumer-check.tsx"], demo);
-run([resolve(root, "node_modules/typescript/bin/tsc"), "--ignoreConfig", "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext", "src/main.ts"], resolve(root, "examples/vanilla-todo"));
+run([resolve(root, "node_modules/typescript/bin/tsc"), "--ignoreConfig", "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext", "src/main.ts", "src/sync.ts", "src/capabilities-worker.ts"], resolve(root, "examples/vanilla-todo"));
 run([npm, "run", "build"], demo);
 run([npm, "run", "build"], next);
 run([resolve(root, "node_modules/@playwright/test/cli.js"), "test", "--config", "playwright.dx.config.mjs"]);
