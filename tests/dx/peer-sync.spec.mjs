@@ -69,8 +69,14 @@ test("public installed-package example pairs independent wallets, syncs offline 
     await b.getByRole("button", { name: "Reopen local project", exact: true }).click();
     await expect(b.locator("#records")).toContainText("Offline on B");
     await expect(b.getByRole("checkbox", { name: "Before connection", exact: true })).toBeChecked();
+    // The view appears before its cursor-close RPC settles. Wait for the app
+    // action to finish so its busy guard cannot discard the subsequent lock.
+    await expect(b.locator("body")).toHaveAttribute("aria-busy", "false");
+    console.log("Peer example: recovered; lock both wallets");
     await Promise.all([a, b].map(page => page.getByRole("button", { name: "Lock wallet", exact: true }).click()));
+    await Promise.all([a, b].map(page => expect(page.locator("#wallet")).toBeVisible()));
     await expect.poll(() => relay.activeSubscriptions).toBe(0);
+    console.log("Peer example: locks and relay cleanup complete");
     expect(errors).toEqual([]);
     expect(relay.events.length).toBeGreaterThan(0);
     expect(JSON.stringify(relay.events)).not.toContain("Before connection");
@@ -78,8 +84,8 @@ test("public installed-package example pairs independent wallets, syncs offline 
     // During finally Playwright may not have marked a thrown assertion failed yet.
     {
       const diagnostics = await Promise.all([a, b].map(async page => ({
-        error: await page.locator("#error").innerText().catch(() => "Page unavailable"),
-        network: await page.locator("#network-status").innerText().catch(() => "Page unavailable"),
+        error: await page.locator("#error").innerText({ timeout: 2000 }).catch(() => "Page unavailable"),
+        network: await page.locator("#network-status").innerText({ timeout: 2000 }).catch(() => "Page unavailable"),
       })));
       await test.info().attach("transport-diagnostics", { body: JSON.stringify(diagnostics), contentType: "application/json" });
     }

@@ -41,8 +41,9 @@ void capabilityCheck();
 async function action(work: () => Promise<void>) {
   if (busy) return;
   busy = true; element("error").textContent = ""; document.body.setAttribute("aria-busy", "true");
+  element<HTMLButtonElement>("close").disabled = true;
   try { await work(); } catch (error) { report(error); }
-  finally { busy = false; document.body.setAttribute("aria-busy", "false"); }
+  finally { busy = false; document.body.setAttribute("aria-busy", "false"); element<HTMLButtonElement>("close").disabled = false; }
 }
 function requireClient() { if (!client) throw new Error("Unlock this device first"); return client; }
 function pauseSync() {

@@ -54,6 +54,13 @@ jobs:
       - name: Inspect the final tested archive without executing it
         id: package
         run: node scripts/verify-package.mjs
+      - name: Keep browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-browser-failure-evidence
+          path: test-results/
+          if-no-files-found: ignore
       - name: Validate registry packaging without publishing
         env:
           ARCHIVE: ${{ steps.package.outputs.archive }}

@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/dx", workers: 1, timeout: 60000,
-  use: { headless: true, channel: "chrome" },
+  use: { headless: true, channel: "chrome", trace: "retain-on-failure" },
   webServer: [
     { command: "npm run dev --prefix tests/fixtures/react-probe", url: "http://127.0.0.1:4180/demo/", reuseExistingServer: false },
     { command: "npm run preview --prefix tests/fixtures/react-probe", url: "http://127.0.0.1:4181/demo/", reuseExistingServer: false },

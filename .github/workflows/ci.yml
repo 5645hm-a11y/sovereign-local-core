@@ -39,6 +39,13 @@ jobs:
           source .tools/emsdk-main/emsdk_env.sh
           npm run test:dx
       - run: npm run check:release
+      - name: Keep browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-failure-evidence
+          path: test-results/
+          if-no-files-found: ignore
       - name: Scan committed source for secrets
         run: |
           mkdir -p .tools/security
