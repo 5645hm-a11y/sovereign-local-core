@@ -28,6 +28,9 @@ See the [two-device walkthrough](ADOPTION.md) and
   tested archive to a separate least-privilege job and publishes with provenance.
   Real registry publication still needs NPM owner authorization. NPM currently
   rejected the authenticated account's publication until 2FA is configured.
+- Verification-only workflow runs also generate signed GitHub/Sigstore provenance
+  for the actual tested archive, verifiable with `gh attestation verify`. This
+  provides build traceability before NPM publication; it is not an NPM attestation.
 - Automated JavaScript/TypeScript CodeQL analysis is configured separately from
   the existing unit/browser/DX and credential scans.
 

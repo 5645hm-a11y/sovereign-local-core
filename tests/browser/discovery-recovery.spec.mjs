@@ -35,7 +35,10 @@ async function connect(page, url, names, { recovery = true, routed = true, recov
       actor.errors = [];
       actor.network = new P2PWebRTC(actor.db, { discovery: actor.discovery, iceServers: [], maxPeers: 3,
         helloIntervalMs: 150, reconnectBaseMs: 100, connectionTimeoutMs: 10000,
-        ...(recovery ? { recovery: { discovery: actor.recovery, intervalMs: 1000, responseTimeoutMs: 3000, transferTimeoutMs: 30000 } } : {}),
+        // The live-only relay stores no missed probes. Match the accelerated 150ms
+        // directory rotation with enough probe opportunities in the 30s assertion;
+        // a 3s response budget allowed unlucky sampled buckets to miss the window.
+        ...(recovery ? { recovery: { discovery: actor.recovery, intervalMs: 1000, responseTimeoutMs: 1000, transferTimeoutMs: 30000 } } : {}),
         onError: error => actor.errors.push(error.name) });
       actor.db.storage.addPeer(actor.network); await actor.network.start();
     }

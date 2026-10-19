@@ -75,7 +75,8 @@ test("public installed-package example pairs independent wallets, syncs offline 
     expect(relay.events.length).toBeGreaterThan(0);
     expect(JSON.stringify(relay.events)).not.toContain("Before connection");
   } finally {
-    if (test.info().status !== test.info().expectedStatus) {
+    // During finally Playwright may not have marked a thrown assertion failed yet.
+    {
       const diagnostics = await Promise.all([a, b].map(async page => ({
         error: await page.locator("#error").innerText().catch(() => "Page unavailable"),
         network: await page.locator("#network-status").innerText().catch(() => "Page unavailable"),

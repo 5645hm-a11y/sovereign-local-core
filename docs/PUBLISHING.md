@@ -41,7 +41,8 @@ and checksums are not an independent security audit.
 
 [publish.yml](../.github/workflows/publish.yml) is manually dispatched. It defaults
 to verification only. Actions are pinned by commit. The build job has read-only
-repository access; only the separate publication job receives `id-token: write`.
+repository access; only the separate attestation/publication jobs receive
+`id-token: write`.
 
 The build job runs unit, real-browser and installed-package tests, inspects the
 final tested archive, runs a publication dry run and uploads that archive/report.
@@ -54,6 +55,17 @@ gh workflow run publish.yml --ref v0.3.1 -f publish=false
 # Once account/registry authorization is configured:
 gh workflow run publish.yml --ref v0.3.1 -f publish=true
 ```
+
+Verification-only runs also create a signed GitHub/Sigstore build attestation for
+the tested archive. This does not require an NPM account and is distinct from an
+NPM registry attestation. Download the release archive and verify it with:
+
+```sh
+gh attestation verify sovereign-local-core-0.3.1.tgz --repo 5645hm-a11y/sovereign-local-core --signer-workflow 5645hm-a11y/sovereign-local-core/.github/workflows/publish.yml
+```
+
+Check its source commit against the release manifest. This proves the signed
+workflow/build association, not that the engine is free of vulnerabilities.
 
 ### First publication and account requirements
 
