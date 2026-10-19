@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Two-device sync · Sovereign Local Core</title>
+  <link rel="stylesheet" href="/src/sync.css">
+</head>
+<body>
+<header><a href="./index.html">Sovereign Local Core</a><a href="https://github.com/5645hm-a11y/sovereign-local-core">Source &amp; security boundaries</a></header>
+<main>
+  <h1>Make two devices agree.</h1>
+  <p class="intro">A small SDK example: local wallets, encrypted OPFS and live WebRTC sync. Open this same HTTPS address on both devices. Each device keeps its own wallet. Use synthetic data and a test passphrase.</p>
+  <p id="capabilities" role="status">Checking this browser’s local storage capabilities…</p>
+  <p id="error" role="alert"></p>
+  <form id="wallet">
+    <h2>Unlock this device</h2>
+    <label>Wallet ID<input name="walletId" autocomplete="username" maxlength="128" required></label>
+    <label>Local passphrase<input name="passphrase" type="password" autocomplete="current-password" minlength="12" maxlength="1024" required></label>
+    <p>The passphrase unlocks a random-key wallet on this origin. It does not recover a deleted wallet or sign in with Google.</p>
+    <button disabled>Unlock wallet</button>
+  </form>
+  <section id="workspace" hidden>
+    <div class="session"><p id="project-status" role="status">Wallet unlocked. Create, reopen or join a project.</p><button id="close" type="button">Lock wallet</button></div>
+    <label>This device’s public ActorID<textarea id="actor" readonly rows="2"></textarea></label>
+    <div class="columns">
+      <section>
+        <h2>Pair the devices</h2>
+        <p>On device A, create a project. On device B, unlock a different wallet and send its public ActorID to A.</p>
+        <form id="project-form">
+          <label>Project ID<input name="projectId" pattern="[A-Za-z0-9_-]{1,128}" required></label>
+          <div class="actions"><button name="action" value="create">Create project</button><button name="action" value="open">Reopen local project</button></div>
+        </form>
+        <form id="invite" hidden>
+          <label>Recipient ActorID<textarea name="recipient" rows="2" required></textarea></label>
+          <button>Create Member invitation</button>
+          <label>Signed invitation for device B<textarea id="invitation-output" readonly rows="4"></textarea></label>
+          <button id="copy-invitation" type="button">Copy invitation</button>
+        </form>
+        <label id="root-label" hidden>Project root ActorID — send separately to device B<textarea id="root" readonly rows="2"></textarea></label>
+        <form id="join">
+          <h3>Join on device B</h3>
+          <label>Signed invitation<textarea name="invitation" rows="4" maxlength="1048576" required></textarea></label>
+          <label>Trusted root ActorID<textarea name="trustedRoot" rows="2" required></textarea></label>
+          <p>Confirm the root with the project owner through a trusted channel. Copying it from an untrusted invitation does not establish trust.</p>
+          <button>Verify invitation and join</button>
+        </form>
+      </section>
+      <section>
+        <h2>Sync and try offline edits</h2>
+        <fieldset id="network-controls" disabled>
+          <label for="relays">Nostr relay URLs</label><textarea id="relays" rows="2">wss://nos.lol
+wss://relay.primal.net</textarea>
+          <details><summary>STUN / TURN configuration</summary>
+            <label for="ice">ICE servers (JSON array)</label><textarea id="ice" rows="4">[{"urls":"stun:stun.l.google.com:19302"}]</textarea>
+            <p>Supply your own short-lived TURN credentials when direct connections fail. Credentials stay in memory and are not stored in this example.</p>
+          </details>
+          <div class="actions"><button id="connect" type="button">Connect peers</button><button id="disconnect" type="button" disabled>Pause sync</button></div>
+        </fieldset>
+        <p id="network-status" role="status">Sync paused. Local writes remain available after opening a project.</p>
+        <form id="add-note"><fieldset id="write-controls" disabled><label>Record title<input name="title" maxlength="500" required></label><button>Add record</button></fieldset></form>
+        <p id="empty">No records yet. Add one, connect both peers, then watch it appear on the other device.</p>
+        <ul id="records" aria-label="Shared records"></ul>
+        <p id="read-limit" hidden>This example shows the first 100 records.</p>
+        <p>Pause sync on B, edit on both devices, then reconnect B. Reload either page and reopen with its wallet and project ID to check local recovery.</p>
+      </section>
+    </div>
+  </section>
+  <footer>Public relays and STUN are external services. Relays see connection metadata. A reachable authorized peer is required for catch-up; background mobile sync and universal connectivity are not guaranteed.</footer>
+</main>
+<script type="module" src="/src/sync.ts"></script>
+</body></html>

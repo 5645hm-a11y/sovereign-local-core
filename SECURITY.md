@@ -1,9 +1,15 @@
 # Security boundaries and reporting
 
-Version 0.3.0 is experimental and has not received an independent security audit.
+Version 0.3.1 is experimental and has not received an independent security audit.
 The tests cover selected integrity, authorization, recovery and transport behaviors;
 passing tests are not proof of complete security.
 No avionics, safety-critical or regulatory certification is claimed.
+
+The [independent review packet](docs/SECURITY_REVIEW.md) identifies the attack
+surfaces and completion criteria. Preparing that packet and running automated
+scans do not mean an independent audit has occurred. The
+[browser/device matrix](docs/BROWSER_SUPPORT.md) distinguishes tested runtimes
+from unverified mobile/WebView environments.
 
 The core uses browser Web Crypto for encrypted identity vaults, P-256 event
 signatures, ECDH key envelopes and AES-GCM project/chunk encryption. It verifies

@@ -1,0 +1,69 @@
+{
+  "measuredAt": "2026-10-19T06:15:33.926Z",
+  "packageVersion": "0.3.1",
+  "workerSha256": "797796ee335e206d7a97526988a9bde86f403bdaaaef784b9847fe9c6d2dd535",
+  "platform": "win32",
+  "scope": "Installed-package desktop automation on this host; mock blind Nostr relay with real WebRTC/Workers/OPFS. No physical mobile devices, Safari product, Capacitor WebViews, public-internet NAT or background suspension certification.",
+  "observations": [
+    {
+      "engine": "chrome",
+      "test": "wallet, complete WASM boot, durable OPFS write and reload",
+      "status": "passed",
+      "runtime": {
+        "engine": "chrome",
+        "version": "155.0.8059.80",
+        "platform": "win32",
+        "date": "2026-10-19T06:14:16.547Z"
+      },
+      "capabilityResult": "Worker OPFS flush/read, Web Crypto and basic WASM checks passed. Opening a project tests the complete engine.",
+      "error": null
+    },
+    {
+      "engine": "firefox",
+      "test": "wallet, complete WASM boot, durable OPFS write and reload",
+      "status": "passed",
+      "runtime": {
+        "engine": "firefox",
+        "version": "155.0",
+        "platform": "win32",
+        "date": "2026-10-19T06:14:24.115Z"
+      },
+      "capabilityResult": "Worker OPFS flush/read, Web Crypto and basic WASM checks passed. Opening a project tests the complete engine.",
+      "error": null
+    },
+    {
+      "engine": "webkit",
+      "test": "wallet, complete WASM boot, durable OPFS write and reload",
+      "status": "failed",
+      "runtime": {
+        "engine": "webkit",
+        "version": "26.6",
+        "platform": "win32",
+        "date": "2026-10-19T06:14:57.932Z"
+      },
+      "capabilityResult": "OPFS directory: UnknownError: The operation failed for an unknown transient reason (e.g. out of memory).",
+      "error": "Error: expect(locator).toContainText(expected) failed"
+    },
+    {
+      "engine": "chrome",
+      "test": "public installed-package example pairs independent wallets, syncs offline edits and reopens OPFS",
+      "status": "passed",
+      "capabilityResult": null,
+      "error": null
+    },
+    {
+      "engine": "firefox",
+      "test": "public installed-package example pairs independent wallets, syncs offline edits and reopens OPFS",
+      "status": "failed",
+      "capabilityResult": null,
+      "error": "Error: expect(locator).toContainText(expected) failed"
+    },
+    {
+      "engine": "webkit",
+      "test": "public installed-package example pairs independent wallets, syncs offline edits and reopens OPFS",
+      "status": "failed",
+      "capabilityResult": null,
+      "error": "Error: expect(locator).toContainText(expected) failed"
+    }
+  ]
+}

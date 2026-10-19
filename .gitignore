@@ -6,6 +6,8 @@ playwright-report/
 artifacts/
 package-dist/
 .package-build/
+.impeccable/review/
+.playwright-mcp/
 examples/react-demo/build/
 examples/react-demo/public/p2p-core/
 tests/fixtures/next-app/.next/

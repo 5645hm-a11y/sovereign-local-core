@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.3.1 — 2026-10-19
+
+- Added a public two-device TypeScript walkthrough using installed package assets:
+  separate wallets, pinned-root invitations, initial/live WebRTC sync, offline
+  edits, reconnect, OPFS reload and cleanup. Public discovery starts only on request.
+- Added archive inspection that runs no package code, with regression checks for
+  injected install hooks and unexpected runtime dependencies.
+- Added a separate verified-package publication workflow with NPM provenance/OIDC,
+  version-tag/digest checks and least-privilege build/publish jobs. Registry
+  publication still requires actual owner authorization; workflow availability is
+  not evidence that a version has been uploaded or attested.
+- Added desktop Chrome/Firefox/WebKit compatibility checks and recorded failures,
+  an explicit unverified physical-mobile/WebView matrix, and an external security
+  review handoff. No independent audit or new mobile compatibility is claimed.
+- Added automated JavaScript/TypeScript CodeQL security analysis. Core C++ ABI,
+  cryptographic formats and engine runtime are unchanged from 0.3.0.
+
 ## 0.3.0 — 2026-10-13
 
 Public database-engine release with prebuilt browser Worker/WASM assets, MIT

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sovereign Local Core · TypeScript To-Do</title>
 <style>body{font:16px/1.6 system-ui;max-width:720px;margin:48px auto;padding:0 24px}form{display:grid;gap:12px}label{display:grid}input,button{font:inherit;padding:8px}li{display:flex;align-items:center;gap:12px;margin:12px 0}li label{display:flex;flex:1}#error{color:#a22222}[hidden]{display:none}</style></head>
-<body><h1>Sovereign Local Core</h1><p>A plain TypeScript To-Do app. Tasks live in encrypted OPFS and survive a page reload.</p>
+<body><h1>Sovereign Local Core</h1><p>A plain TypeScript To-Do app. Tasks live in encrypted OPFS and survive a page reload.</p><p><a href="./sync.html">Try the two-device WebRTC sync example</a></p>
 <form id="login"><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="12" maxlength="1024" required></label><label>Project ID<input name="projectId" pattern="[A-Za-z0-9_-]{1,128}" required></label><button>Open project</button></form>
 <p>Reuse your credentials and project ID to reopen this local project. Passwords are not saved in localStorage.</p>
 <section id="project" hidden><button id="close">Close project</button><form id="add"><label>Task title<input name="title" maxlength="500" required></label><button>Add task</button></form><ul id="tasks"></ul></section>

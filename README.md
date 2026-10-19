@@ -11,12 +11,22 @@ files through encrypted streams instead of putting file bytes in the database lo
 [Quick start](#quick-start) · [Examples](examples/README.md) · [Architecture](#architecture)
 · [Benchmarks](docs/WASM_BENCHMARKS.md) · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
 
-**Status: experimental, version 0.3.0.** This is a working, tested database core,
+**Status: experimental, version 0.3.1.** This is a working, tested database core,
 not a drop-in Supabase replacement or an independently audited security product.
 "Zero-server" means no database or authentication server is required for local
 operation. Online peer discovery uses signaling relays; internet connectivity
 may also need STUN/TURN. Public Nostr relays support encrypted peer
 discovery, removing the need to operate your own signaling server.
+
+**Evaluating it for an existing app?** Start with the [two-device walkthrough](docs/ADOPTION.md)
+and [browser/mobile evidence](docs/BROWSER_SUPPORT.md). The public TypeScript example
+now includes wallet pairing, root-pinned invitations, live WebRTC sync, paused
+offline edits and recovery after reload. Google Sign-In is a separate integration;
+wallets are not Google accounts. [Independent security review status and scope](docs/SECURITY_REVIEW.md).
+
+[Open the public two-device SDK example](https://5645hm-a11y.github.io/sovereign-local-core/sync.html)
+on both devices. Use synthetic data and test wallets. The example is an optional
+static client; it is not a hosted database or authentication service.
 
 **New in 0.3.0: query less, replay less, keep writes fast.** Native scalar
 filters, ordered keyset pages and incremental indexes avoid rebuilding a field
@@ -127,11 +137,11 @@ applications do not need a C++ compiler. Chrome is the browser tested in this re
 Install the GitHub release artifact today:
 
 ```sh
-npm install https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.0/sovereign-local-core-0.3.0.tgz
+npm install https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.1/sovereign-local-core-0.3.1.tgz
 ```
 
 The package is prepared under the NPM name `sovereign-local-core`. Registry
-publication is pending authentication; `npm install sovereign-local-core` becomes
+publication is pending owner publishing authorization; `npm install sovereign-local-core` becomes
 available after that separate publication. The GitHub artifact works now.
 To build and install from source instead, see [Contributing](CONTRIBUTING.md).
 
