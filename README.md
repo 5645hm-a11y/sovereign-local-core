@@ -134,15 +134,18 @@ Use a browser with OPFS synchronous access in Workers, Web Crypto and WASM excep
 support, on **HTTPS or localhost**. Installed packages include the Worker and WASM;
 applications do not need a C++ compiler. Chrome is the browser tested in this repo.
 
-Install the GitHub release artifact today:
+Install from the public NPM registry:
 
 ```sh
-npm install https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.1/sovereign-local-core-0.3.1.tgz
+npm install sovereign-local-core
 ```
 
-The package is prepared under the NPM name `sovereign-local-core`. Registry
-publication is pending owner publishing authorization; `npm install sovereign-local-core` becomes
-available after that separate publication. The GitHub artifact works now.
+Version **0.3.1** is [published on NPM](https://www.npmjs.com/package/sovereign-local-core).
+For a pinned installation, use `npm install sovereign-local-core@0.3.1`.
+The registry tarball matches the tested GitHub release archive byte for byte;
+[verification and build-attestation instructions](docs/PUBLISHING.md) explain the evidence.
+The initial registry publication used local 2FA authorization and has no NPM
+provenance attestation; the separate GitHub build attestation remains verifiable.
 To build and install from source instead, see [Contributing](CONTRIBUTING.md).
 
 ### Vanilla TypeScript

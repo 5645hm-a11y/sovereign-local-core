@@ -26,8 +26,10 @@ See the [two-device walkthrough](ADOPTION.md) and
   initial/live/offline sync and OPFS recovery through real DataChannels.
 - A manually dispatched GitHub workflow verifies/builds the package, transfers the
   tested archive to a separate least-privilege job and publishes with provenance.
-  Real registry publication still needs NPM owner authorization. NPM currently
-  rejected the authenticated account's publication until 2FA is configured.
+  Version 0.3.1 is now public on NPM after interactive owner 2FA authorization.
+  Its registry archive matches the tested GitHub archive byte for byte. This first
+  local publication has no NPM provenance attestation; CI trusted publishing still
+  needs its package configuration.
 - Verification-only workflow runs also generate signed GitHub/Sigstore provenance
   for the actual tested archive, verifiable with `gh attestation verify`. This
   provides build traceability before NPM publication; it is not an NPM attestation.

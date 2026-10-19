@@ -17,11 +17,11 @@ package, real Workers/OPFS, signed invitations and real WebRTC DataChannels.
 It needs no application-owned signaling server. Public Nostr relays and STUN are
 configured explicitly; substitute your relays/TURN when needed.
 
-From a checkout, use Node.js 24. No C++ compiler is required when using a released
-archive. In `examples/vanilla-todo`, install the tested release directly:
+From a checkout, use Node.js 24. No C++ compiler is required when using the released
+package. In `examples/vanilla-todo`, install the tested registry version:
 
 ```sh
-npm install --ignore-scripts https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.1/sovereign-local-core-0.3.1.tgz
+npm install --ignore-scripts sovereign-local-core@0.3.1
 npm run dev
 ```
 

@@ -11,8 +11,9 @@
   injected install hooks and unexpected runtime dependencies.
 - Added a separate verified-package publication workflow with NPM provenance/OIDC,
   version-tag/digest checks and least-privilege build/publish jobs. Registry
-  publication still requires actual owner authorization; workflow availability is
-  not evidence that a version has been uploaded or attested.
+  publication completed on 2026-10-19 using interactive owner 2FA. The registry
+  archive matches the tested GitHub archive; it has no NPM provenance attestation.
+  The separate GitHub build attestation remains available for those exact bytes.
 - Added desktop Chrome/Firefox/WebKit compatibility checks and recorded failures,
   an explicit unverified physical-mobile/WebView matrix, and an external security
   review handoff. No independent audit or new mobile compatibility is claimed.

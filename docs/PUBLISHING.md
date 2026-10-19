@@ -7,16 +7,40 @@ and publication tooling without changing the engine runtime or binary formats.
 
 ## Install
 
-Use the public GitHub release archive until registry publication is verified:
+Version **0.3.1** is [publicly available on NPM](https://www.npmjs.com/package/sovereign-local-core),
+verified on 2026-10-19:
+
+```sh
+npm install sovereign-local-core
+# Or pin the tested release:
+npm install sovereign-local-core@0.3.1
+```
+
+A clean registry installation passed SDK imports, export checks and the embedded
+Worker hash check; `npm audit signatures` verified the package registry signature.
+The registry tarball is byte-identical to the verified GitHub
+release archive (605,907 bytes, SHA-256
+`1042cb2331cef890174bc8b4d6ebda870fb008bea3b22654f004411f0886a368`).
+The initial publication used local, interactive 2FA authorization. It has **no NPM
+provenance attestation**. The separate signed GitHub build attestation below links
+these exact bytes to their tested source/workflow; it is not a registry attestation.
+Trusted publishing still needs its NPM package configuration before future CI releases.
+
+Inspect current registry metadata with:
+
+```sh
+npm view sovereign-local-core@0.3.1 version dist.integrity dist.attestations --json
+```
+
+The immutable GitHub archive remains an alternative:
 
 ```sh
 npm install --ignore-scripts https://github.com/5645hm-a11y/sovereign-local-core/releases/download/v0.3.1/sovereign-local-core-0.3.1.tgz
 ```
 
-After a successful registry publication, the pinned registry command is
-`npm install sovereign-local-core@0.3.1`. Check actual availability with
-`npm view sovereign-local-core@0.3.1 version dist.integrity dist.attestations --json`.
-A GitHub release or workflow does not establish registry publication or provenance.
+The archived README predates registry publication; this page records the updated status.
+A successful `npm publish` message alone is insufficient: check public version metadata,
+download the tarball and test an actual consumer installation after propagation.
 
 Import the root SDK, `sovereign-local-core/react` or `sovereign-local-core/nostr`.
 [Quick start](../README.md#quick-start), [two-device example](ADOPTION.md) and
